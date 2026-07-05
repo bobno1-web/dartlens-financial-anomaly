@@ -1,0 +1,31 @@
+# --- Secrets ---------------------------------------------------------------
+.env
+
+# --- Data layers (regenerable / large): ignore contents, keep the folders ---
+data/raw/*
+data/parsed/*
+data/cache/*
+output/*
+
+# Keep folder placeholders so the directory structure is tracked
+!data/raw/.gitkeep
+!data/parsed/.gitkeep
+!data/cache/.gitkeep
+!output/.gitkeep
+
+# --- Validation bundles (외부검증용 Excel/raw 복사본, 대용량) -----------------
+# output/* · data/* 패턴은 경로 고정이라 이 복사본 트리를 못 거른다. 통째로 제외.
+validation_bundle/
+
+# --- Python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# --- OS / editor -----------------------------------------------------------
+.DS_Store
+Thumbs.db
+
+# NOTE: docs/, src/, tests/, mappings/, config/ are intentionally tracked.

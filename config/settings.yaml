@@ -1,0 +1,37 @@
+# config/settings.yaml
+# Placeholder settings for the OpenDART industry-anomaly tool.
+# NO secrets here — the API key lives in .env (OPENDART_API_KEY).
+# All values below are placeholders to be confirmed before implementation.
+
+# --- Collection scope -------------------------------------------------------
+bsns_year: 2025          # business (reporting) year; single year for the MVP (Loop 1: Samsung 2025)
+reprt_code: "11011"      # 11011=annual, 11012=half, 11013=Q1, 11014=Q3 (MVP: annual)
+target_fs_div: "CFS"     # CFS=consolidated (target); OFS=separate (fallback only)
+target_stock_code: "005930"   # Loop 1 target = 삼성전자 (resolved to corp_code via corpCode)
+
+# --- Peer grouping / benchmark ---------------------------------------------
+min_peers: 5             # minimum computable peers required to emit a benchmark
+ksic_prefix_len: 3       # KSIC induty_code prefix length for industry grouping
+
+# --- Output -----------------------------------------------------------------
+output_dir: "output"     # directory for timestamped .xlsx reports
+
+# --- Collection / peer scan (Loop 1) ----------------------------------------
+listed_corp_cls: ["Y", "K"]   # 상장회사 범위: Y=유가증권, K=코스닥 (OpenDART corp_cls 정의 기준; config로 관리)
+raw_dir: "data/raw"
+cache_dir: "data/cache"
+parsed_dir: "data/parsed"
+request_timeout_sec: 20
+request_delay_sec: 0.0
+max_retries: 3
+scan_workers: 8               # induty_code 스캔 병렬 워커 수
+peer_scan_limit: 0            # 0 = 전체 상장사 스캔; >0 이면 스캔 상한(로그에 명시)
+peer_cfs_debug_limit: 20      # 디버그용 CFS 수집 peer 수 상한(로그/엑셀에 명시)
+
+# --- Anomaly thresholds (config-driven, never hardcoded in source) ----------
+# Placeholders aligned with docs/METHODOLOGY.md; confirm before implementation.
+anomaly:
+  iqr_fence_k: 1.5       # Tukey fence multiplier: Q1 - k*IQR (LOW) / Q3 + k*IQR (HIGH)
+  robust_z_cutoff: 3.5   # |0.6745*(value-median)/MAD| severity threshold
+  winsor_lower_pct: 5    # winsorize bounds — apply to informational mean/std only
+  winsor_upper_pct: 95

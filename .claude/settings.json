@@ -1,0 +1,21 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell|Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_auto_mode.py\" || py \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_auto_mode.py\"",
+            "timeout": 10,
+            "statusMessage": "Auto-mode safety guard 검사 중..."
+          }
+        ]
+      }
+    ]
+  }
+}
