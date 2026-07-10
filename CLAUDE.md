@@ -17,6 +17,7 @@ MVP · 로컬 Python 스크립트 · **웹앱 아님**. 감사가능성(auditabi
 | 리뷰 절차(cr1) | `references/review-protocol.md` |
 | MVP 로드맵·5대 교정 | `docs/PLAN.md` |
 | 확정 결정·미결 질문 | `docs/DECISIONS.md` |
+| 웹 UI(로컬 Streamlit wrapper, 엔진 미변경) | `docs/WEB_UI_PLAN.md` |
 
 각 주제의 **정본은 위 문서**다. 이 라우터는 요약만 담고, 세부 내용을 중복 서술하지 않는다.
 

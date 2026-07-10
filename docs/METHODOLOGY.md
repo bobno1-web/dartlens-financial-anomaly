@@ -40,7 +40,7 @@ Each (company, ratio, year) receives exactly one label:
 | NORMAL | within the peer range; not a review candidate |
 | HIGH | above the upper fence (Q3 + k·IQR) — unusually high vs peers |
 | LOW | below the lower fence (Q1 − k·IQR) — unusually low vs peers |
-| INSUFFICIENT_PEERS | fewer than `min_peers` computable peers (after one KSIC rollup); not assessed |
+| INSUFFICIENT_PEERS | fewer than `min_peers` computable peers; not assessed. **No 2-digit KSIC rollup** (avoids mixing unrelated industries); the shortfall is surfaced via `09_제한적_peer_비교` (named real-peer direct comparison) instead of being filled. |
 | NOT_COMPUTABLE | ratio undefined (denominator ≤ 0, missing account, negative equity); excluded from the distribution, never imputed |
 | INSUFFICIENT_VARIANCE | peer spread is zero (IQR = 0 and MAD = 0); no meaningful fence, no flag |
 

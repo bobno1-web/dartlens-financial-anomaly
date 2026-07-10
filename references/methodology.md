@@ -38,7 +38,7 @@ CFS LONG에서 비율의 분자·분모 계정을 뽑을 때:
 | NORMAL | peer 범위 안 — 검토 후보 아님 |
 | HIGH | 상단 fence 초과 (Q3 + k·IQR) — peer 대비 비정상적으로 높음 |
 | LOW | 하단 fence 미만 (Q1 − k·IQR) — peer 대비 비정상적으로 낮음 |
-| INSUFFICIENT_PEERS | 계산가능 peer가 `min_peers` 미만(1회 KSIC rollup 후) — 판정 안 함 |
+| INSUFFICIENT_PEERS | 계산가능 peer가 `min_peers` 미만 — 판정 보류. **2자리 KSIC rollup을 하지 않는다**(무관 업종 혼입 방지). 부족은 채우지 않고 `09_제한적_peer_비교`(실제 peer 실명 직접 비교)로 표면화한다. |
 | NOT_COMPUTABLE | 비율 미정의(분모 ≤ 0, 계정 누락, 음(−) 자본) — 분포에서 제외, 대치 없음 |
 | INSUFFICIENT_VARIANCE | peer 분산이 0(IQR=0 & MAD=0) — 의미 있는 fence 없음, 플래그 없음 |
 

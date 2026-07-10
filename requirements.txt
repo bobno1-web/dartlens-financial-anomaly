@@ -1,0 +1,14 @@
+# OpenDART 산업대비 재무 이상징후 도구 (Ralph Loop 1~4)
+# 분석 엔진
+requests>=2.31
+PyYAML>=6.0
+python-dotenv>=1.0
+openpyxl>=3.1
+XlsxWriter>=3.1
+
+# Streamlit UI MVP (Loop 4)
+pandas>=2.0
+streamlit>=1.30
+
+# 개발/테스트
+pytest>=7.4

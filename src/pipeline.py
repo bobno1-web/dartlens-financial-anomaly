@@ -74,7 +74,7 @@ def build_dataset(stock_code, bsns_year, settings, paths, api_key) -> dict:
     records = corp_codes.parse_corp_codes(client.get_corpcode_xml())
     listed = corp_codes.listed_companies(records)
 
-    print("  - 대상(삼성전자) 해결 + 기업개황...", flush=True)
+    print("  - 대상 회사 해결 + 기업개황...", flush=True)
     target = collect.resolve_target(client, records, stock_code, prefix_len)
     print(f"    corp_code={target['corp_code']} induty={target['induty_code']} prefix={target['effective_prefix']}", flush=True)
 
@@ -86,13 +86,13 @@ def build_dataset(stock_code, bsns_year, settings, paths, api_key) -> dict:
     if len(peers) == 0:
         raise StopConditionError("peer 후보가 0개입니다. (STOP)")
 
-    print("  - 삼성전자 CFS 수집...", flush=True)
+    print(f"  - {target['corp_name']} CFS 수집...", flush=True)
     t_rows, t_status, t_hash, t_raw = collect.fetch_cfs(
         client, target["corp_code"], target["corp_name"], bsns_year, stock_code=target["stock_code"])
     if t_status == "013":
-        raise StopConditionError(f"삼성전자 {bsns_year} CFS 조회 불가(013). 2024 자동 fallback 안 함. (STOP)")
+        raise StopConditionError(f"{target['corp_name']} {bsns_year} CFS 조회 불가(013). 2024 자동 fallback 안 함. (STOP)")
     if t_status != "000" or not t_rows:
-        raise StopConditionError(f"삼성전자 {bsns_year} CFS 수집 실패(status {t_status}). (STOP)")
+        raise StopConditionError(f"{target['corp_name']} {bsns_year} CFS 수집 실패(status {t_status}). (STOP)")
     print(f"    CFS {len(t_rows)}행 (rcept_no {t_rows[0]['rcept_no']})", flush=True)
 
     print(f"  - peer 전체 CFS 수집 ({len(peers)}건, 상한 없음)...", flush=True)
@@ -341,10 +341,11 @@ def _compute_benchmarks(ds, ratio_rows_all, target_cc, *, min_peers, iqr_k, wl, 
 
 def _excluded_summary(comparison_rows, ds, pool_details):
     from collections import Counter
+    target_name = (ds.get("target") or {}).get("corp_name") or "대상회사"  # fail-close
     out = []
     for row in comparison_rows:
         if row["label"] in ("NOT_COMPUTABLE", "INSUFFICIENT_PEERS", "INSUFFICIENT_VARIANCE"):
-            out.append({"kind": "비율 판정 불가/부족", "who": "삼성전자", "item": row["ratio"],
+            out.append({"kind": "비율 판정 불가/부족", "who": target_name, "item": row["ratio"],
                         "reason": f"{compare.LABEL_KO[row['label']]} - {row['reason']}"})
     for e in ds["excluded"]:
         out.append({"kind": "CFS 사용불가(peer)", "who": e["corp_name"], "item": e["corp_code"],
@@ -588,7 +589,11 @@ def load_loop3_benchmark_debug(path: Path) -> dict:
 
         def ix2(n):
             return h.index(n) if h and n in h else -1
-        ir, ilab, itv = ix2("비율명"), ix2("label"), ix2("삼성전자값")
+        # 대상회사값(신) 우선, 삼성전자값(구 산출물) fallback — 헤더 일반화 하위호환
+        itv = ix2("대상회사값")
+        if itv < 0:
+            itv = ix2("삼성전자값")
+        ir, ilab = ix2("비율명"), ix2("label")
         for row in it:
             if not row or ir < 0 or row[ir] is None:
                 continue
