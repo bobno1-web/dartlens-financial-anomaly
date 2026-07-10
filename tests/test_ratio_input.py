@@ -46,10 +46,46 @@ def test_ratio_values_and_borrowings_aggregate():
     out = ratio_input.compute_company({"corp_code": "C", "corp_name": "테스트", "is_target": "대상"},
                                       _samsung_like())
     rr = {r["ratio"]: r for r in out["ratio_rows"]}
-    assert len(rr) == 15
+    assert len(rr) == 16   # Loop 15: 이자보상배율(영업이익/이자비용) 추가로 15→16
     assert rr["부채비율"]["computable"] and abs(rr["부채비율"]["ratio_value"] - Decimal("40") / Decimal("60")) < Decimal("1e-9")
     # 차입금의존도 = (5+3)/100 = 0.08
     assert rr["차입금의존도"]["computable"] and rr["차입금의존도"]["ratio_value"] == Decimal("8") / Decimal("100")
+    # Loop 15: 이자비용 라인이 없는 표본 → 이자보상배율 NOT_COMPUTABLE(strict, 은폐 금지)
+    assert "이자보상배율" in rr and not rr["이자보상배율"]["computable"]
+    assert rr["이자보상배율"]["reason"] == "missing_account"
+
+
+def test_interest_expense_from_cf_adjustment_makes_ratio_computable():
+    """IS/CIS에 순수 이자비용 라인이 없어도 간접법 CF 조정(dart_AdjustmentsForInterestExpenses,
+    nm 이자비용)으로 이자보상배율이 계산 가능(대한항공류). 순수 이자비용이지 이자지급 현금흐름 아님."""
+    rows = _samsung_like() + [_row("CF", "dart_AdjustmentsForInterestExpenses", "이자비용", "9")]
+    r = accounts.resolve_concept(rows, accounts.CONCEPTS["이자비용"])
+    assert r["match"] == "account_id" and r["value"] == Decimal("9")
+    out = ratio_input.compute_company({"corp_code": "C", "corp_name": "t", "is_target": "peer"}, rows)
+    rr = {x["ratio"]: x for x in out["ratio_rows"]}
+    assert rr["이자보상배율"]["computable"]
+    assert rr["이자보상배율"]["ratio_value"] == Decimal("18") / Decimal("9")   # 영업이익18/이자비용9
+
+
+def test_interest_paid_cashflow_does_not_leak_as_interest_expense():
+    """CF 이자지급(InterestPaid, nm '이자의 지급')만 있고 순수 이자비용이 없으면 이자보상배율
+    NOT_COMPUTABLE 유지 — 현금흐름 이자지급이 이자비용으로 새지 않는다(strict)."""
+    rows = _samsung_like() + [
+        _row("CF", "dart_InterestPaidClassifiedAsOperatingActivities", "이자의 지급", "7")]
+    r = accounts.resolve_concept(rows, accounts.CONCEPTS["이자비용"])
+    assert r["match"] == "MISSING"
+    out = ratio_input.compute_company({"corp_code": "C", "corp_name": "t", "is_target": "peer"}, rows)
+    rr = {x["ratio"]: x for x in out["ratio_rows"]}
+    assert not rr["이자보상배율"]["computable"]
+
+
+def test_pure_is_interest_expense_preferred_over_cf_adjustment():
+    """IS의 순수 InterestExpense가 CF 조정보다 우선(sj 우선 IS<CIS<CF)."""
+    rows = _samsung_like() + [
+        _row("IS", "ifrs-full_InterestExpense", "이자비용", "6"),
+        _row("CF", "dart_AdjustmentsForInterestExpenses", "이자비용", "9")]
+    r = accounts.resolve_concept(rows, accounts.CONCEPTS["이자비용"])
+    assert r["sj_div"] == "IS" and r["value"] == Decimal("6")
 
 
 def test_invalid_denominator_and_missing_not_computable():

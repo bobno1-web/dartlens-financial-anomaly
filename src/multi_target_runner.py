@@ -17,6 +17,7 @@ from datetime import datetime
 
 from . import config
 from . import excel_report as xr
+from . import red_flags
 from .dart_client import DartError, StopConditionError
 from .pipeline import _compute_benchmarks, _excluded_summary, build_dataset
 from .sparse_peer_comparison import build_sparse_peer_comparison
@@ -44,6 +45,7 @@ SUMMARY_COLUMNS = [
     ("sparse_peer_comparison_available", "sparse비교"), ("sparse_peer_ratio_count", "sparse비율수"),
     ("sparse_peer_company_count_min", "sparse_peer_min"), ("sparse_peer_company_count_max", "sparse_peer_max"),
     ("sparse_peer_note", "sparse비고"),
+    ("red_flag_count", "red_flag수"), ("red_flags", "red_flag내역"),
     ("final_report_path", "최종리포트경로"), ("debug_report_path", "debug경로"),
     ("status", "status"), ("fail_reason", "실패사유"), ("notes", "비고"),
 ]
@@ -84,6 +86,7 @@ def _blank_row(stock_code, bsns_year, industry_hint) -> dict:
             "sparse_peer_comparison_available": None, "sparse_peer_ratio_count": None,
             "sparse_peer_company_count_min": None, "sparse_peer_company_count_max": None,
             "sparse_peer_note": "",
+            "red_flag_count": None, "red_flags": "",
             "final_report_path": None, "debug_report_path": None,
             "status": None, "fail_reason": "", "notes": ""}
 
@@ -132,6 +135,11 @@ def run_target(stock_code, bsns_year, settings, paths, api_key, *, industry_hint
         row["fail_reason"] = f"benchmark 계산 실패: {type(e).__name__}: {e}"
         return row
 
+    # Loop 15: 절대판정(red flag) 병렬 레이어. comparison_rows(상대판정)는 읽기만 하고 변경하지 않는다(INV-7).
+    rf_assessment = red_flags.assess(ratio_rows_all, target_cc, ds["t_rows"], settings)
+    for crow in comparison_rows:
+        crow["abs_verdict"] = red_flags.ratio_verdict(rf_assessment, crow["ratio"])
+
     lc = _label_counts(comparison_rows)
     qc = _quality_counts(comparison_rows)
     row["ratio_total"] = len(comparison_rows)
@@ -159,6 +167,13 @@ def run_target(stock_code, bsns_year, settings, paths, api_key, *, industry_hint
         row["sparse_peer_company_count_max"] = ""
         row["sparse_peer_note"] = "sparse 비율 없음(전 비율 benchmark 성립)"
 
+    # Loop 15: 절대판정(red flag) 요약 — 트리거·평가불가를 summary에 표면화(은폐 금지).
+    _trig = [f for f in rf_assessment["flags"] if f.get("triggered")]
+    _na = [f for f in rf_assessment["flags"] if f.get("status") == "해당없음"]
+    row["red_flag_count"] = len(_trig)
+    _base = "; ".join(f"{f['message']}({f['severity']})" for f in _trig) if _trig else "없음"
+    row["red_flags"] = _base + (f" (평가불가 {len(_na)}종)" if _na else "")
+
     # --- Excel (target 식별 파일명, 기존 파일 미덮어쓰기: _atomic_new_path가 clobber 거부) ---
     try:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -168,11 +183,12 @@ def run_target(stock_code, bsns_year, settings, paths, api_key, *, industry_hint
             paths["output"] / f"{safe}_산업대비_이상징후_리포트_{bsns_year}_{ts}.xlsx",
             target=target, target_cfs_rows=ds["t_rows"], peers=ds["peers"], peer_rows=ds["peer_rows"],
             comparison_rows=comparison_rows, excluded_summary=excluded_summary, meta=fmeta,
-            sparse_comparison=sparse_rows)
+            sparse_comparison=sparse_rows, red_flag_assessment=rf_assessment)
         dbg_path = xr.build_benchmark_debug_workbook(
             paths["output"] / f"benchmark_debug_{safe}_{bsns_year}_{ts}.xlsx",
             target=target, comparison_rows=comparison_rows, pool_details=pool_details,
-            ratio_rows_all=ratio_rows_all, target_trace=ds["target_trace"], meta=fmeta)
+            ratio_rows_all=ratio_rows_all, target_trace=ds["target_trace"], meta=fmeta,
+            red_flag_assessment=rf_assessment)
         row["final_report_path"] = str(final_path)
         row["debug_report_path"] = str(dbg_path)
     except Exception as e:  # noqa: BLE001

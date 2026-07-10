@@ -39,6 +39,16 @@ CONCEPTS = {
               "nm": ["영업이익", "영업이익(손실)"]},
     "당기순이익": {"sj": ["IS", "CIS"], "ids": ["ifrs-full_ProfitLoss"],
                "nm": ["당기순이익", "당기순이익(손실)"]},
+    # Loop 15: 이자보상배율 분모. **순수 이자비용만** strict 매핑한다.
+    #   - 혼합계정(ifrs-full_FinanceCosts=금융비용: 이자+외환+기타)은 **fallback 금지**.
+    #   - IS/CIS에 별도 이자비용 라인이 없는 회사가 많아, 간접법 CF 조정의 순수 이자비용
+    #     (dart_AdjustmentsForInterestExpenses, nm=이자비용)을 명시적 예외로 허용한다. 이는
+    #     P&L 발생주의 이자비용과 동일 금액이며 현금흐름(이자지급/InterestPaid)과 다르다.
+    #     그래도 못 뽑는 회사 → 이자보상배율 NOT_COMPUTABLE(은폐 금지, references/safety-rules §3).
+    "이자비용": {"sj": ["IS", "CIS", "CF"],
+              "ids": ["ifrs-full_InterestExpense", "dart_InterestExpense",
+                      "dart_AdjustmentsForInterestExpenses"],
+              "nm": ["이자비용"]},
 }
 
 # 이자부 차입금 구성(합산). 리스부채는 제외.

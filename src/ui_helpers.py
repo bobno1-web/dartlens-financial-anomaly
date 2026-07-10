@@ -31,6 +31,15 @@ LABEL_COLORS = {
     "분포 부족": ("#E0E0E0", "#616161"),
 }
 
+# Loop 15: 절대판정(red flag) 색상 — danger red 미사용(점검 신호이지 위험 확정 아님). 앰버/노랑/회색.
+ABS_COLORS = {
+    "경고": ("#FFD180", "#5D4037"),
+    "주의": ("#FFF3C4", "#6D4C41"),
+    "정상": ("#F5F5F5", "#424242"),
+    "해당없음": ("#FAFAFA", "#9E9E9E"),
+    "미평가": ("#FFFFFF", "#BDBDBD"),
+}
+
 
 # --------------------------------------------------------------------------
 # 파일 탐지 (읽기 전용, .tmp·중간 실패 파일 무시)
@@ -183,20 +192,48 @@ def extract_summary(final_path) -> dict:
     if df.empty:
         return out
     out["total_ratios"] = len(df)
-    if "peer 후보 수" in df.columns:
-        out["peer_candidates"] = _first_num(df["peer 후보 수"])
-    if "CFS 성공 peer 수" in df.columns:
-        out["cfs_success"] = _first_num(df["CFS 성공 peer 수"])
-    if "CFS 실패 peer 수" in df.columns:
-        out["cfs_fail"] = _first_num(df["CFS 실패 peer 수"])
-    if "판정" in df.columns:
-        labels = [str(x) for x in df["판정"].tolist() if x is not None and str(x) != "nan"]
+    # peer/CFS 수: 06_Peer_List 우선(신 9열 리포트), 없으면 비율시트 컬럼(구 24열 리포트) fallback
+    cand, succ, fail = _peer_counts_from_06(final_path)
+    if cand is not None:
+        out["peer_candidates"], out["cfs_success"], out["cfs_fail"] = cand, succ, fail
+    else:
+        if "peer 후보 수" in df.columns:
+            out["peer_candidates"] = _first_num(df["peer 후보 수"])
+        if "CFS 성공 peer 수" in df.columns:
+            out["cfs_success"] = _first_num(df["CFS 성공 peer 수"])
+        if "CFS 실패 peer 수" in df.columns:
+            out["cfs_fail"] = _first_num(df["CFS 실패 peer 수"])
+    jcol = _first_col(df, "상대판정", "판정")
+    if jcol:
+        labels = [str(x) for x in df[jcol].tolist() if x is not None and str(x) != "nan"]
         out["computable_count"] = sum(1 for l in labels if l != "계산 불가")
         counts = {}
         for l in labels:
             counts[l] = counts.get(l, 0) + 1
         out["label_counts"] = counts
     return out
+
+
+# Loop 15: 비율 시트 컬럼 별칭(구 24열 리포트/신 9열 리포트 모두 읽기). 앞이 신, 뒤가 구.
+def _first_col(df, *names):
+    for n in names:
+        if n in df.columns:
+            return n
+    return None
+
+
+def _peer_counts_from_06(final_path):
+    """06_Peer_List에서 peer 후보/CFS 성공·실패 수(신 9열 리포트는 비율시트에 없어 여기서 조달)."""
+    try:
+        df = sheet_to_df(final_path, "06_Peer_List", header_contains="기업코드")
+    except Exception:
+        return None, None, None
+    if "대상여부" not in df.columns or "CFS수집상태" not in df.columns:
+        return None, None, None
+    peers = df[df["대상여부"] == "peer"]
+    cand = len(peers)
+    succ = sum(1 for x in peers["CFS수집상태"].tolist() if str(x) == "성공")
+    return cand, succ, cand - succ
 
 
 def _get(df, ratio_name, col):
@@ -214,10 +251,14 @@ def _get(df, ratio_name, col):
 def build_interpretation(final_path) -> list[str]:
     """실제 label/percentile/benchmark_quality에서 핵심 해석 문장 생성. 데이터 없으면 기본 안내."""
     df = combined_ratio_df(final_path)
-    if df.empty or "판정" not in df.columns:
+    jcol = _first_col(df, "상대판정", "판정") if not df.empty else None
+    if df.empty or jcol is None:
         return ["분석 결과 데이터를 읽지 못했습니다. output 폴더의 최신 리포트를 확인하세요."]
+    pcol = _first_col(df, "산업 내 위치(percentile)", "percentile")
+    qcol = _first_col(df, "benchmark_quality", "신뢰도(peer·품질)")
+    acol = _first_col(df, "절대판정(red flag)")
     lines = []
-    labels = [str(x) for x in df["판정"].tolist() if x is not None]
+    labels = [str(x) for x in df[jcol].tolist() if x is not None]
     n = len(labels)
     n_normal = sum(1 for l in labels if l == "정상 범위")
     if n and n_normal == n:
@@ -226,9 +267,15 @@ def build_interpretation(final_path) -> list[str]:
         highs = sum(1 for l in labels if l == "산업 대비 높음")
         lows = sum(1 for l in labels if l == "산업 대비 낮음")
         lines.append(f"총 {n}개 비율 중 정상 {n_normal} · 산업 대비 높음 {highs} · 산업 대비 낮음 {lows} 입니다.")
+    # 절대판정(red flag) — 상대판정과 별개로 절대 기준선 경고/주의를 표면화(위험 확정 아님)
+    if acol:
+        warns = [str(r["비율명"]) for _, r in df.iterrows() if str(r.get(acol)) in ("경고", "주의")]
+        if warns:
+            lines.append(f"절대판정 red flag: {', '.join(warns[:6])}에서 경고/주의 신호가 있습니다"
+                         "(검토가 필요한 점검 신호이며 위험 확정이 아닙니다).")
     # 영업이익률 상/하위권
-    op_label = _get(df, "영업이익률", "판정")
-    op_pct = _get(df, "영업이익률", "percentile")
+    op_label = _get(df, "영업이익률", jcol)
+    op_pct = _get(df, "영업이익률", pcol) if pcol else None
     if op_label is not None and op_pct is not None:
         try:
             p = float(op_pct)
@@ -238,13 +285,13 @@ def build_interpretation(final_path) -> list[str]:
                 lines.append(f"영업이익률은 산업 내 하위권(percentile ≈ {p:.0f})이나 IQR 이상치 기준은 초과하지 않았습니다.")
         except (TypeError, ValueError):
             pass
-    # benchmark_quality 제한 비율
-    if "benchmark_quality" in df.columns and "비율명" in df.columns:
+    # benchmark_quality 제한 비율(신 리포트는 '신뢰도' 열에 'WEAK (peer n)' 형태)
+    if qcol and "비율명" in df.columns:
         limited = [str(r["비율명"]) for _, r in df.iterrows()
-                   if str(r.get("benchmark_quality")) in ("WEAK", "LIMITED")]
+                   if str(r.get(qcol)).upper().startswith(("WEAK", "LIMITED"))]
         if limited:
             lines.append("매출채권·매입채무 등 " + ", ".join(limited[:4])
-                         + " 비율은 benchmark_quality가 제한적(WEAK/LIMITED)이라 해석에 주의가 필요합니다.")
+                         + " 비율은 신뢰도가 제한적(WEAK/LIMITED)이라 해석에 주의가 필요합니다.")
     return lines
 
 
@@ -252,14 +299,23 @@ def build_interpretation(final_path) -> list[str]:
 # 표 스타일 / 다운로드
 # --------------------------------------------------------------------------
 def style_ratio_df(df: pd.DataFrame):
-    """판정 열에 라벨 색상(주황/파랑/회색) 적용한 Styler 반환. 초록/빨강 미사용."""
-    if "판정" not in df.columns:
+    """상대판정·절대판정 열에 색상 적용. 초록/빨강(좋음·나쁨) 미사용; red flag는 앰버/노랑."""
+    jcol = _first_col(df, "상대판정", "판정")
+    acol = _first_col(df, "절대판정(red flag)")
+    if jcol is None and acol is None:
         return df
 
     def _row_style(row):
-        bg, fg = LABEL_COLORS.get(str(row.get("판정", "")), ("", ""))
-        style = f"background-color: {bg}; color: {fg}" if bg else ""
-        return [style if col == "판정" else "" for col in df.columns]
+        styles = []
+        for col in df.columns:
+            if col == jcol:
+                bg, fg = LABEL_COLORS.get(str(row.get(jcol, "")), ("", ""))
+            elif col == acol:
+                bg, fg = ABS_COLORS.get(str(row.get(acol, "")), ("", ""))
+            else:
+                bg = fg = ""
+            styles.append(f"background-color: {bg}; color: {fg}" if bg else "")
+        return styles
 
     try:
         return df.style.apply(_row_style, axis=1)

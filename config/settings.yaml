@@ -35,3 +35,58 @@ anomaly:
   robust_z_cutoff: 3.5   # |0.6745*(value-median)/MAD| severity threshold
   winsor_lower_pct: 5    # winsorize bounds — apply to informational mean/std only
   winsor_upper_pct: 95
+
+# --- Absolute red flags (Loop 15, config-driven; never hardcoded in source) --
+# 회사·산업 무관한 절대 기준선. 상대판정(HIGH/LOW/NORMAL)과 독립적으로 병렬 평가한다.
+# red flag는 "위험 확정"이 아니라 "검토 경고 / 점검 신호"다(표현 중립, references/safety-rules).
+# 임계값·연산자·문구는 전부 여기서 조달한다. 코드에는 임계값 리터럴을 두지 않는다.
+#   metric  : 대상회사 값의 어느 필드로 판단하는가
+#             ratio_value(비율값) / numerator_value(분자) / denominator_value(분모)
+#             / op_cash_flow_vs_net_income(영업현금흐름 대 순이익, 특수)
+#   op      : "<" | ">" | "special"
+#   severity: 경고 | 주의   (경고 > 주의 우선)
+red_flag:
+  enabled: true
+  flags:
+    - key: current_ratio_below_1
+      linked_ratio: 유동비율
+      metric: ratio_value
+      op: "<"
+      threshold: 1.0
+      severity: 경고
+      message: "유동부채 초과, 단기 지급능력 경고"
+    - key: negative_working_capital
+      linked_ratio: 운전자본비율
+      metric: numerator_value
+      op: "<"
+      threshold: 0
+      severity: 경고
+      message: "운전자본 잠식 경고"
+    - key: interest_coverage_below_1
+      linked_ratio: 이자보상배율
+      metric: ratio_value
+      op: "<"
+      threshold: 1.0
+      severity: 경고
+      message: "영업이익으로 이자 미충당 경고"
+    - key: negative_equity
+      linked_ratio: 부채비율
+      metric: denominator_value
+      op: "<"
+      threshold: 0
+      severity: 경고
+      message: "완전 자본잠식 경고"
+    - key: high_debt_ratio
+      linked_ratio: 부채비율
+      metric: ratio_value
+      op: ">"
+      threshold: 4.0
+      severity: 주의
+      message: "고부채 주의"
+    - key: cash_profit_divergence
+      linked_ratio: 순이익률
+      metric: op_cash_flow_vs_net_income
+      op: "special"
+      threshold: 0
+      severity: 주의
+      message: "이익-현금 괴리 주의"

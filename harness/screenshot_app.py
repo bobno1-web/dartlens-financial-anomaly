@@ -46,6 +46,8 @@ def main():
         _render_report_for("한화솔루션")   # HIGH 1건 화면
     elif shot == "sparse":
         _render_report_for("현대자동차")   # peer 부족 → sparse 09시트 안내
+    elif shot == "redflag":
+        _render_report_for("태영건설")     # 상대=정상 + 절대=경고 (red flag)
     else:
         A.render_landing()
 
