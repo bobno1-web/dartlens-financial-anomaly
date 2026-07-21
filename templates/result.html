@@ -30,6 +30,14 @@
 {% endfor %}
 {% set market_label = {'Y':'유가증권시장(KOSPI)', 'K':'코스닥(KOSDAQ)', 'N':'코넥스'}.get(tgt.market, tgt.market) %}
 
+{# 계산 제한(비율 판정 불가/부족) 사유 조회표 — 08시트 항목→사유. 표시 전용(값 불변, INV-7). #}
+{% set reasons = {} %}
+{% for row in r.excluded.rows %}
+  {%- if m.cell(row, r.excluded.columns, '구분')|trim == '비율 판정 불가/부족' -%}
+    {%- set _ = reasons.update({ (m.cell(row, r.excluded.columns, '항목')|trim): (m.cell(row, r.excluded.columns, '사유')|trim|replace('계산 불가 - ', '')|replace('계산 불가 -', '')) }) -%}
+  {%- endif -%}
+{% endfor %}
+
 {% if message %}<div class="dl-alert dl-alert-ok">{{ message }}</div>{% endif %}
 
 <section class="dl-section" style="margin-top:1.2rem">
@@ -48,26 +56,32 @@
 
   <div class="dl-summary">
     <div class="dl-stat">
-      <div class="k">분석 비율 수</div>
+      <div class="k">분석 비율</div>
       <div class="v">{{ r.summary.computable_count if r.summary.computable_count is not none else '-' }}<small> / {{ r.summary.total_ratios if r.summary.total_ratios is not none else '-' }}</small></div>
-      <div class="s">계산 가능 · 전체</div>
+      <div class="s">비교한 재무비율 개수</div>
     </div>
     <div class="dl-stat {% if cnt.warn %}is-amber{% endif %}">
-      <div class="k">절대 경고 건수</div>
+      <div class="k">절대 경고</div>
       <div class="v">{{ cnt.warn }}</div>
-      <div class="s">주의 {{ cnt.caution }}건 (red flag 점검 신호)</div>
+      <div class="s">업종과 무관하게 위험한 신호</div>
     </div>
-    <div class="dl-stat {% if highlow %}is-amber{% endif %}">
-      <div class="k">업종 대비 특이 건수</div>
-      <div class="v">{{ highlow }}</div>
-      <div class="s">HIGH/LOW · 표본·계산 제한 {{ cnt.info }}건</div>
+    <div class="dl-stat">
+      <div class="k">계산 제한</div>
+      <div class="v">{{ cnt.info }}</div>
+      <div class="s">데이터 부족으로 판정 보류</div>
     </div>
+  </div>
+
+  <div class="dl-infobox">
+    <b>두 가지 방식으로 봅니다.</b> <b>업종 대비</b>는 같은 업종 회사들과 비교해 높은지/낮은지를,
+    <b>절대 경고</b>는 업종과 상관없이 그 자체로 위험한 기준을 넘었는지를 봅니다.
+    표시는 결론이 아니라 <b>먼저 검토할 후보</b>입니다.
   </div>
 </section>
 
 <section class="dl-section">
   <h2>먼저 검토할 재무 항목</h2>
-  <p class="dl-sub">위험 신호(절대 경고 · 주의 · 산업 대비 특이)를 위로 정렬했습니다. 정상 항목은 아래에 흐리게 둡니다.</p>
+  <p class="dl-sub">위험 신호(절대 경고 · 주의 · 산업 대비 특이)와 계산 제한 항목을 먼저 보여줍니다. 정상 항목은 아래에서 펼쳐볼 수 있습니다.</p>
   <div class="dl-ratios">
 
     {% if cnt.warn %}<div class="dl-tier-label">절대 경고</div>
@@ -94,19 +108,24 @@
       {% for g in r.groups %}{% for row in g.rows %}
         {%- set absr = m.cell(row, g.columns, '절대판정(red flag)')|trim -%}
         {%- set rel = m.relof(row, g.columns)|trim -%}
-        {% if absr not in ('경고','주의') and rel in ('peer 부족','분포 부족','계산 불가') %}{{ m.ratio_row(row, g.columns, 'info') }}{% endif %}
+        {% if absr not in ('경고','주의') and rel in ('peer 부족','분포 부족','계산 불가') %}{{ m.ratio_row(row, g.columns, 'info', reasons=reasons) }}{% endif %}
       {% endfor %}{% endfor %}
     {% endif %}
 
-    {% if cnt.normal %}<div class="dl-tier-label">정상 범위</div>
+  </div>
+
+  {% if cnt.normal %}
+  <details class="dl-normal-fold">
+    <summary><span>정상 범위 <b>{{ cnt.normal }}</b>개 항목</span><span class="dl-fold-hint"></span></summary>
+    <div class="dl-ratios">
       {% for g in r.groups %}{% for row in g.rows %}
         {%- set absr = m.cell(row, g.columns, '절대판정(red flag)')|trim -%}
         {%- set rel = m.relof(row, g.columns)|trim -%}
         {% if absr not in ('경고','주의') and rel not in ('산업 대비 높음','산업 대비 낮음','peer 부족','분포 부족','계산 불가') %}{{ m.ratio_row(row, g.columns, 'normal') }}{% endif %}
       {% endfor %}{% endfor %}
-    {% endif %}
-
-  </div>
+    </div>
+  </details>
+  {% endif %}
 </section>
 
 {% if r.interpretation %}

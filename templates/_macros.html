@@ -26,15 +26,60 @@
 {%- elif t %}<span class="badge {{ cls }} badge-mini" title="절대판정(red flag)">{{ t }}</span>{% endif -%}
 {%- endmacro %}
 
-{# 재무비율 한 항목 라인. tone ∈ {risk, info, normal} 로 강조/흐림 제어. #}
-{% macro ratio_row(row, columns, tone) -%}
+{# 미니 가로 막대: 우리 회사(앰버) vs 산업 중앙(회갈색). 같은 척도(둘 중 |max|)로 정규화 —
+   왜곡 없이 두 막대가 같은 기준. 음수(운전자본 등)는 중앙 0선 기준 좌/우. 라벨은 엔진 실값(지어낸 값 없음). #}
+{% macro ratio_bar(our_s, med_s) -%}
+{%- set v = our_s | float(0) -%}
+{%- set m = med_s | float(0) -%}
+{%- set scale = ([v | abs, m | abs] | max) or 1 -%}
+{%- set neg = (v < 0) or (m < 0) -%}
+<div class="rt-bars">
+  {%- for cap, val_s, val, cls in [('우리', our_s, v, 'rt-bar-ours'), ('산업', med_s, m, 'rt-bar-ind')] -%}
+  <div class="rt-bar-row">
+    <span class="rt-bar-cap">{{ cap }}</span>
+    <div class="rt-bar-track{% if neg %} center0{% endif %}">
+      {%- if neg -%}
+        {%- set w = (val | abs / scale) * 50 -%}
+        <div class="rt-bar {{ cls }}" style="left:{{ (50 if val >= 0 else 50 - w) | round(2) }}%;width:{{ w | round(2) }}%"></div>
+      {%- else -%}
+        <div class="rt-bar {{ cls }}" style="left:0;width:{{ ((val / scale) * 100) | round(2) }}%"></div>
+      {%- endif -%}
+    </div>
+    <span class="rt-bar-val" title="{{ val_s }}">{{ val_s }}</span>
+  </div>
+  {%- endfor -%}
+</div>
+{%- endmacro %}
+
+{# 재무비율 한 항목 라인. tone ∈ {risk, info, normal}.
+   risk = 우리/산업 미니 그래프(실값) · info(계산 제한) = 이유 표기(그래프 없음) · normal = 기본 지표. #}
+{% macro ratio_row(row, columns, tone, reasons={}) -%}
 {%- set name = cell(row, columns, '비율명') | trim -%}
 {%- set val  = cell(row, columns, '대상회사 값') | trim -%}
 {%- set med  = cell(row, columns, '산업 중앙값') | trim -%}
 {%- set pct  = cell(row, columns, '산업 내 위치(percentile)') | trim -%}
 {%- set rel  = relof(row, columns) -%}
 {%- set absr = cell(row, columns, '절대판정(red flag)') | trim -%}
-<div class="dl-ratio tone-{{ tone }}">
+{%- if tone == 'risk' -%}
+<div class="dl-ratio dl-ratio-risk tone-risk">
+  <div class="rt-head">
+    <div class="rt-name">{{ name }}</div>
+    <div class="rt-badges">{{ rel_badge(rel) }}{{ abs_badge(absr) }}</div>
+  </div>
+  {{ ratio_bar(val, med) }}
+  {% if pct %}<div class="rt-cap">산업 내 위치 <b>{{ pct }}</b> percentile</div>{% endif %}
+</div>
+{%- elif tone == 'info' -%}
+{%- set reason = reasons.get(name, '') -%}
+<div class="dl-ratio tone-info">
+  <div class="rt-left">
+    <div class="rt-name">{{ name }}</div>
+    <div class="rt-reason">{% if reason %}{{ reason }}{% else %}데이터 부족으로 판정을 보류했습니다.{% endif %}</div>
+  </div>
+  <div class="rt-badges">{{ rel_badge(rel) }}{{ abs_badge(absr) }}</div>
+</div>
+{%- else -%}
+<div class="dl-ratio tone-normal">
   <div class="rt-left">
     <div class="rt-name">{{ name }}</div>
     <div class="rt-metrics">
@@ -45,6 +90,7 @@
   </div>
   <div class="rt-badges">{{ rel_badge(rel) }}{{ abs_badge(absr) }}</div>
 </div>
+{%- endif -%}
 {%- endmacro %}
 
 {# 일반 표(peer/제외/sparse) — 값 그대로 출력, 스타일만. #}
