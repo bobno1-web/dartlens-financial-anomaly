@@ -238,15 +238,34 @@ def build_interpretation(final_path) -> list[str]:
     qcol = _first_col(df, "benchmark_quality", "신뢰도(peer·품질)")
     acol = _first_col(df, "절대판정(red flag)")
     lines = []
-    labels = [str(x) for x in df[jcol].tolist() if x is not None]
-    n = len(labels)
-    n_normal = sum(1 for l in labels if l == "정상 범위")
-    if n and n_normal == n:
-        lines.append(f"{n}개 비율 모두 현재 peer universe와 IQR 기준상 정상 범위입니다(이상치로 분류되지 않음).")
+    # Loop 24: 결과 화면 상단 티어와 동일한 상호배타 6분류 → 합이 항상 총 비율 수와 일치(누락 표시 방지).
+    # 우선순위: 절대판정 경고 > 절대판정 주의 > 상대판정 업종 높음/낮음 > 계산 제한(peer·분포 부족·계산
+    # 불가) > 정상. 표시 전용 카운트 — 엔진이 산출한 label/절대판정을 '읽어' 분류만 한다(값·판정 불변, INV-7).
+    _INFO_LABELS = {"peer 부족", "분포 부족", "계산 불가"}
+    cnt = {"normal": 0, "warn": 0, "caution": 0, "high": 0, "low": 0, "info": 0}
+    for _, r in df.iterrows():
+        absr = str(r.get(acol)).strip() if acol else ""
+        rel = str(r.get(jcol)).strip()
+        if absr == "경고":
+            cnt["warn"] += 1
+        elif absr == "주의":
+            cnt["caution"] += 1
+        elif rel == "산업 대비 높음":
+            cnt["high"] += 1
+        elif rel == "산업 대비 낮음":
+            cnt["low"] += 1
+        elif rel in _INFO_LABELS:
+            cnt["info"] += 1
+        else:
+            cnt["normal"] += 1
+    n = sum(cnt.values())
+    if n and cnt["normal"] == n:
+        lines.append(f"총 {n}개 비율 모두 현재 peer universe·IQR 기준상 정상 범위입니다(이상치로 분류되지 않음).")
     else:
-        highs = sum(1 for l in labels if l == "산업 대비 높음")
-        lows = sum(1 for l in labels if l == "산업 대비 낮음")
-        lines.append(f"총 {n}개 비율 중 정상 {n_normal} · 산업 대비 높음 {highs} · 산업 대비 낮음 {lows} 입니다.")
+        lines.append(
+            f"총 {n}개 비율 중 정상 {cnt['normal']} · 절대 경고 {cnt['warn']} · 절대 주의 {cnt['caution']} · "
+            f"계산 제한 {cnt['info']} (업종 대비 높음 {cnt['high']} · 낮음 {cnt['low']})."
+        )
     # 절대판정(red flag) — 상대판정과 별개로 절대 기준선 경고/주의를 표면화(위험 확정 아님)
     if acol:
         warns = [str(r["비율명"]) for _, r in df.iterrows() if str(r.get(acol)) in ("경고", "주의")]
@@ -265,13 +284,16 @@ def build_interpretation(final_path) -> list[str]:
                 lines.append(f"영업이익률은 산업 내 하위권(percentile ≈ {p:.0f})이나 IQR 이상치 기준은 초과하지 않았습니다.")
         except (TypeError, ValueError):
             pass
-    # benchmark_quality 제한 비율(신 리포트는 '신뢰도' 열에 'WEAK (peer n)' 형태)
+    # Loop 24: 신뢰도 제한 비율 안내 — 영어 코드(WEAK/LIMITED) 제거, 이유를 한글로 명시.
+    # benchmark_quality 정의상 제한 사유는 '계산 가능 peer 표본이 작거나(n<2*min_peers) 계정
+    # 커버리지(n/CFS성공)가 낮음'이며 고정 peer 임계값이 아니다(coverage 부족은 peer가 많아도 발생 —
+    # 예: peer 22·26에서도 WEAK). 따라서 특정 개수를 지어내지 않고 실제 제한 비율만 동적으로 나열한다.
     if qcol and "비율명" in df.columns:
         limited = [str(r["비율명"]) for _, r in df.iterrows()
                    if str(r.get(qcol)).upper().startswith(("WEAK", "LIMITED"))]
         if limited:
-            lines.append("매출채권·매입채무 등 " + ", ".join(limited[:4])
-                         + " 비율은 신뢰도가 제한적(WEAK/LIMITED)이라 해석에 주의가 필요합니다.")
+            lines.append(" · ".join(limited[:4])
+                         + " 항목은 비교 가능한 동종업체(peer)가 적어 산업 비교의 신뢰도가 제한적입니다.")
     return lines
 
 

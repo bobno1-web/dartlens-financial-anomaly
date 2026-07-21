@@ -37,6 +37,21 @@ YEARS = [2025, 2024]        # UI 선택지(회사 하드코딩 아님 — 연도
 DEFAULT_YEAR = 2025
 
 
+# ── 표시 전용 숫자 필터(Loop 24) ─────────────────────────────────────────────
+# 결과 화면의 '더러운 소수점'을 깔끔히 보여준다. 저장값·엔진 계산은 불변이며(정보 손실 0),
+# 원본 full precision 은 템플릿에서 title 툴팁으로 유지한다.
+#   fmt_ratio : 비율값 — 2자리 + 성격별 단위(pct=×100%, mult=배, plain=없음)
+#   fmt_pct   : percentile(산업 내 위치) — 0~100 위치값이라 1자리, 단위 없음(×100 아님)
+@app.template_filter("fmt_ratio")
+def _fmt_ratio(raw, ratio_name=""):
+    return web_engine.format_ratio_value(raw, ratio_name)
+
+
+@app.template_filter("fmt_pct")
+def _fmt_pct(raw):
+    return web_engine.format_display_number(raw, 1)
+
+
 # ── 세션 상태 (서버 메모리 전용) ─────────────────────────────────────────────
 # 로컬 단일 사용자 도구다. API 키/입력값은 서버 프로세스 메모리(_SESSIONS)에만 두고, 쿠키에는
 # 불투명 sid 만 담는다. 키 값은 쿠키·파일·로그·화면·산출물 어디에도 저장하지 않는다(세션 메모리만).

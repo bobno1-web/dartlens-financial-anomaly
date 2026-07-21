@@ -67,9 +67,10 @@ def test_build_interpretation_reads_data(tmp_path):
     p = _make_final(tmp_path)
     lines = uih.build_interpretation(p)
     joined = " ".join(lines)
-    assert "정상 범위" in joined                  # 전부 NORMAL 문장
+    assert "정상 범위" in joined                  # 전부 NORMAL 문장(6분류 합=총 비율 수)
     assert "상위권" in joined                      # 영업이익률 percentile 90
-    assert "WEAK" in joined or "LIMITED" in joined  # benchmark_quality 제한 안내
+    assert "신뢰도" in joined and "매출채권비율" in joined  # 신뢰도 제한 안내(제한 비율 동적 표기)
+    assert "WEAK" not in joined and "LIMITED" not in joined  # 영어 코드 제거(Loop 24)
 
 
 def test_build_interpretation_safe_default_when_unreadable(tmp_path):

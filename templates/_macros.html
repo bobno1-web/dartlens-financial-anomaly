@@ -28,7 +28,7 @@
 
 {# 미니 가로 막대: 우리 회사(앰버) vs 산업 중앙(회갈색). 같은 척도(둘 중 |max|)로 정규화 —
    왜곡 없이 두 막대가 같은 기준. 음수(운전자본 등)는 중앙 0선 기준 좌/우. 라벨은 엔진 실값(지어낸 값 없음). #}
-{% macro ratio_bar(our_s, med_s) -%}
+{% macro ratio_bar(our_s, med_s, rname='') -%}
 {%- set v = our_s | float(0) -%}
 {%- set m = med_s | float(0) -%}
 {%- set scale = ([v | abs, m | abs] | max) or 1 -%}
@@ -45,7 +45,7 @@
         <div class="rt-bar {{ cls }}" style="left:0;width:{{ ((val / scale) * 100) | round(2) }}%"></div>
       {%- endif -%}
     </div>
-    <span class="rt-bar-val" title="{{ val_s }}">{{ val_s }}</span>
+    <span class="rt-bar-val" title="{{ val_s }}">{{ val_s | fmt_ratio(rname) }}</span>
   </div>
   {%- endfor -%}
 </div>
@@ -66,8 +66,8 @@
     <div class="rt-name">{{ name }}</div>
     <div class="rt-badges">{{ rel_badge(rel) }}{{ abs_badge(absr) }}</div>
   </div>
-  {{ ratio_bar(val, med) }}
-  {% if pct %}<div class="rt-cap">산업 내 위치 <b>{{ pct }}</b> percentile</div>{% endif %}
+  {{ ratio_bar(val, med, name) }}
+  {# Loop 24: 위험 카드의 'percentile' 줄 제거 — 우리/산업 막대로 상대 위치가 이미 보여 정보 중복. #}
 </div>
 {%- elif tone == 'info' -%}
 {%- set reason = reasons.get(name, '') -%}
@@ -83,9 +83,9 @@
   <div class="rt-left">
     <div class="rt-name">{{ name }}</div>
     <div class="rt-metrics">
-      {% if val %}<span>대상값 <b>{{ val }}</b></span>{% endif %}
-      {% if med %}<span>산업중앙 <b>{{ med }}</b></span>{% endif %}
-      {% if pct %}<span>산업 내 위치 <b>{{ pct }}</b></span>{% endif %}
+      {% if val %}<span title="{{ val }}">대상값 <b>{{ val | fmt_ratio(name) }}</b></span>{% endif %}
+      {% if med %}<span title="{{ med }}">산업중앙 <b>{{ med | fmt_ratio(name) }}</b></span>{% endif %}
+      {% if pct %}<span title="{{ pct }}">산업 내 위치 <b>{{ pct | fmt_pct }}</b></span>{% endif %}
     </div>
   </div>
   <div class="rt-badges">{{ rel_badge(rel) }}{{ abs_badge(absr) }}</div>

@@ -35,6 +35,73 @@ def _clean(v):
     return str(v)
 
 
+def format_display_number(raw, decimals: int = 2) -> str:
+    """표시 전용 숫자 포맷(Loop 24): full-precision 원본을 소수 {decimals}자리로 반올림한 문자열.
+
+    ★엔진·저장값·계산은 불변 — 화면에 보이는 숫자만 반올림한다(정보 손실 0). 원본 full precision은
+    호출부에서 title 툴팁 등으로 유지한다. 숫자가 아니면 원문 유지, 빈 값/NaN/inf는 빈 문자열.
+    """
+    if raw is None:
+        return ""
+    s = str(raw).strip()
+    if s == "" or s.lower() == "nan":
+        return ""
+    try:
+        f = float(s)
+    except (TypeError, ValueError):
+        return s                       # 텍스트(예: '계산 불가')는 그대로 표시
+    if f != f or f in (float("inf"), float("-inf")):
+        return ""
+    text = f"{f:.{decimals}f}"
+    if text.lstrip("-") in ("0", "0." + "0" * decimals):   # '-0.00' → '0.00' 정규화
+        text = text.lstrip("-")
+    return text
+
+
+# Loop 24: 비율별 표시 단위 분류 — **비율명 기준(회사 무관)** 이라 INV-4(회사 하드코딩 금지) 위반이
+# 아니다(16개 비율은 모든 회사 공통). 재무 관례: 이익률·부채·구성비 등은 %(×100), 배수·회전율은 '배',
+# 운전자본비율은 음수가 가능해 무단위. 저장값·엔진 계산은 불변 — 화면 숫자 표기에만 쓰인다.
+#   pct  = ×100 후 '%'   | mult = '배'   | plain/미등록 = 단위 없음
+RATIO_UNIT = {
+    "영업이익률": "pct", "순이익률": "pct", "ROA": "pct", "ROE": "pct",
+    "부채비율": "pct", "부채비중": "pct", "차입금의존도": "pct",
+    "매출채권비율": "pct", "재고자산비율": "pct", "매입채무비율": "pct",
+    "유동비율": "mult", "이자보상배율": "mult",
+    "총자산회전율": "mult", "재고자산회전율": "mult", "매출채권회전율": "mult",
+    "운전자본비율": "plain",
+}
+
+
+def format_ratio_value(raw, ratio_name=None, decimals: int = 2) -> str:
+    """표시 전용 비율 포맷(Loop 24): 2자리 반올림 + 비율 성격별 단위(pct=×100%, mult=배, plain=없음).
+
+    ★엔진·저장값·계산 불변 — 화면 숫자만 변환한다(정보 손실 0). %형은 원비율×100(같은 값, 표기만
+    다름)이며 원본 full precision은 호출부 title 툴팁으로 유지한다. 숫자가 아니면 원문, 빈/NaN은 ''.
+    """
+    kind = RATIO_UNIT.get((ratio_name or "").strip())
+    if raw is None:
+        return ""
+    s = str(raw).strip()
+    if s == "" or s.lower() == "nan":
+        return ""
+    try:
+        f = float(s)
+    except (TypeError, ValueError):
+        return s                       # 텍스트(예: '계산 불가')는 그대로 표시
+    if f != f or f in (float("inf"), float("-inf")):
+        return ""
+    if kind == "pct":
+        f *= 100.0
+    text = f"{f:.{decimals}f}"
+    if text.lstrip("-") in ("0", "0." + "0" * decimals):   # '-0.00' → '0.00'
+        text = text.lstrip("-")
+    if kind == "pct":
+        return text + "%"
+    if kind == "mult":
+        return text + "배"
+    return text
+
+
 def _df_to_table(df) -> dict:
     """DataFrame → {'columns': [...], 'rows': [[...], ...]} (NaN/None → '')."""
     if df is None or getattr(df, "empty", True):
