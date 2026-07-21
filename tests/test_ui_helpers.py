@@ -1,4 +1,4 @@
-"""Ralph Loop 4 UI helper 단위 테스트 (Streamlit E2E 아님).
+"""Ralph Loop 4 UI helper 단위 테스트 (웹 UI E2E 아님, 순수 헬퍼 단위).
 
 Loop 11: 삼성 전용 legacy 탐지 함수(find_latest_report/find_latest_debug/resolve_report_pair)
 제거에 따라 해당 9개 테스트를 제거했다. 동등한 최신탐지·pair 매칭 커버리지는 회사 일반 함수

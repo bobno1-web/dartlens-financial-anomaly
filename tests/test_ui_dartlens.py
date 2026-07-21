@@ -1,6 +1,6 @@
 """Ralph Loop 7-2: DARTLens 표시 layer 헬퍼 테스트(status_display / has_sparse_sheet).
 
-원본 데이터 불변 · 표시 layer 변환만 검증. Streamlit 렌더링은 import smoke로 별도 확인.
+원본 데이터 불변 · 표시 layer 변환만 검증(웹 렌더링 계층과 분리된 순수 헬퍼).
 """
 import openpyxl
 

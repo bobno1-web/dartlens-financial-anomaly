@@ -40,9 +40,10 @@ def test_ps1_if_present_launches_flask_and_is_key_safe():
 
 
 def test_no_streamlit_app_remnant():
-    """Loop 20-C: Streamlit 재구축 완료 — Streamlit 진입점 app.py 는 제거되어야 한다(롤백은 git 이력).
-    Flask 진입점 app_flask.py 만 남는다. (run_streamlit.bat 은 untracked라 커밋 대상 아님)."""
+    """Loop 20 마무리: Streamlit 재구축 완료 — Streamlit 진입점 app.py·롤백 런처 run_streamlit.bat 은
+    제거되어야 한다(롤백은 git 이력). Flask 진입점 app_flask.py 만 남는다."""
     assert not (ROOT / "app.py").exists(), "Streamlit app.py 제거됨이어야 함(롤백: git checkout <ref> -- app.py)"
+    assert not (ROOT / "run_streamlit.bat").exists(), "Streamlit 롤백 런처 run_streamlit.bat 제거됨이어야 함"
     assert (ROOT / "app_flask.py").exists(), "Flask 진입점 app_flask.py 는 있어야 함"
 
 

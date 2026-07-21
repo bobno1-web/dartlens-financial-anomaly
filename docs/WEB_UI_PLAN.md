@@ -1,6 +1,12 @@
-# WEB_UI_PLAN.md — Ralph Loop 4: Streamlit UI MVP
+# WEB_UI_PLAN.md — Ralph Loop 4: Streamlit UI MVP (이력 문서)
 
-> **상태**: Loop 4는 **승인된 로컬 Streamlit UI wrapper 단계**다. 웹 UI는 분석 엔진(benchmark/compare/
+> **📌 이력 문서 안내**: 이 문서는 **Loop 4 당시의 Streamlit 기반 웹 UI 계획**을 기록한 것이다.
+> Loop 20에서 웹 UI는 **엔진을 한 줄도 바꾸지 않고 Flask로 재구축**되었다. 아래 본문의
+> `Streamlit`·`app.py`·`streamlit run` 언급은 **당시 계획의 이력**이며 현재 구현이 아니다.
+> 현재 실행·구조는 `README.md`와 `app_flask.py` 를 참조한다.
+> 매핑: `app.py`(Streamlit) → `app_flask.py`(Flask), `python -m streamlit run app.py` → `python app_flask.py`.
+
+> **당시(Loop 4) 상태**: Loop 4는 승인된 로컬 Streamlit UI wrapper 단계였다. 웹 UI는 분석 엔진(benchmark/compare/
 > ratio/accounts/pipeline)을 변경하지 않는 wrapper이며, 산출물 Excel을 읽어 표시하거나 기존 pipeline을
 > 호출만 한다. Loop 4-A에서 report/debug **동일 timestamp 쌍 가드**를 추가했다.
 

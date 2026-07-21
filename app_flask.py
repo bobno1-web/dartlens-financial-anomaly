@@ -14,7 +14,7 @@
   GET  /download  산출 Excel 다운로드(basename, output/ 내부로만 제한)
   GET  /healthz   상태 체크
 
-기존 Streamlit UI(app.py)는 보존한다(롤백 가능). 실행: python app_flask.py
+이전 Streamlit UI(app.py)는 Loop 20-C에서 제거됨 — 롤백은 git 이력(`git checkout <ref> -- app.py`). 실행: python app_flask.py
 """
 from __future__ import annotations
 

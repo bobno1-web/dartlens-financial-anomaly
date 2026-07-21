@@ -10,8 +10,7 @@ XlsxWriter>=3.1
 Flask>=3.0
 pandas>=2.0
 
-# 이전 Streamlit UI(app.py) 보존 — 롤백/참고용. run_streamlit.bat 로 실행 가능.
-streamlit>=1.30
+# (이전 Streamlit UI는 Loop 20에서 Flask로 재구축되며 제거 — streamlit 의존성 불필요. 롤백은 git 이력.)
 
 # 개발/테스트
 pytest>=7.4
