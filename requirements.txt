@@ -6,8 +6,11 @@ python-dotenv>=1.0
 openpyxl>=3.1
 XlsxWriter>=3.1
 
-# Streamlit UI MVP (Loop 4)
+# Web UI — Flask 재구축 (Loop 20-A). 기본 실행: python app_flask.py
+Flask>=3.0
 pandas>=2.0
+
+# 이전 Streamlit UI(app.py) 보존 — 롤백/참고용. run_streamlit.bat 로 실행 가능.
 streamlit>=1.30
 
 # 개발/테스트

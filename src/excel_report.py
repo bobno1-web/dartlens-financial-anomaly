@@ -83,7 +83,9 @@ def _atomic_new_path(path: Path) -> Path:
 
 
 def _add_table(wb, ws, headers, rows, *, header_fmt, num_fmt=None, start_row=0,
-               widths=None, col_num_formats=None):
+               widths=None, col_num_formats=None, text_fmt=None, blank_fmt=None):
+    """표를 쓴다. text_fmt/blank_fmt(Loop 19 테두리용)를 주면 텍스트·빈·무형식 숫자 셀에도 그
+    서식(테두리 등)을 적용한다. 둘 다 None이면 기존 동작과 완전히 동일(값·위치 불변)."""
     for c, h in enumerate(headers):
         ws.write(start_row, c, h, header_fmt)
     if widths:
@@ -99,14 +101,22 @@ def _add_table(wb, ws, headers, rows, *, header_fmt, num_fmt=None, start_row=0,
                     fmt = col_num_formats[c]
                 elif num_fmt is not None:
                     fmt = num_fmt
+                else:
+                    fmt = text_fmt          # 무형식 숫자도 테두리 유지(없으면 None → 기존과 동일)
                 if fmt is not None:
                     ws.write_number(r, c, v, fmt)
                 else:
                     ws.write_number(r, c, v)
             elif v is None:
-                ws.write_blank(r, c, None)
+                if blank_fmt is not None:
+                    ws.write_blank(r, c, None, blank_fmt)
+                else:
+                    ws.write_blank(r, c, None)
             else:
-                ws.write(r, c, v)
+                if text_fmt is not None:
+                    ws.write(r, c, v, text_fmt)
+                else:
+                    ws.write(r, c, v)
         r += 1
     ws.freeze_panes(start_row + 1, 0)
     if headers:
@@ -574,15 +584,16 @@ def _abs_formats(wb):
     }
 
 
-def _write_final_ratio_sheet(wb, ws, comp_rows, *, ratio_fmt, z_fmt, wrap, header_fmt,
-                             label_fmts, label_ko, abs_fmts):
+def _write_final_ratio_sheet(wb, ws, comp_rows, *, val_fmt, pct_fmt, wrap, cell, header_fmt,
+                             label_fmts, label_ko, abs_fmts, note):
     """Loop 15: 사용자용 핵심 9열. 상대판정(median/IQR)과 절대판정(red flag)을 병렬 표시.
-    상세 통계·source는 benchmark_debug로 이동(여기서 숨김, 계산 불변)."""
+    상세 통계·source는 benchmark_debug로 이동(여기서 숨김, 계산 불변).
+    Loop 19: 셀 테두리·회색 헤더·값 2자리/percentile 1자리 서식(값 불변, 표시 서식만)."""
     ws.merge_range(0, 0, 0, len(FINAL_RATIO_COLUMNS) - 1,
                    "상대판정=산업 peer 대비 위치(HIGH=산업 대비 높음/LOW=산업 대비 낮음/정상, median·IQR 기준, "
                    "좋음·나쁨 아님). 절대판정=회사·산업 무관 절대 기준선(red flag) 점검이며 '위험 확정'이 아니라 "
                    "검토 경고/점검 신호입니다. 상세 통계(평균·p25·p75·IQR·robust_z·차이·source 등)는 "
-                   "benchmark_debug 리포트에 있습니다.", wrap)
+                   "benchmark_debug 리포트에 있습니다.", note)
     for c, h in enumerate(FINAL_RATIO_COLUMNS):
         ws.write(1, c, h, header_fmt)
     widths = [16, 26, 14, 14, 18, 14, 20, 62, 22]
@@ -601,24 +612,75 @@ def _write_final_ratio_sheet(wb, ws, comp_rows, *, ratio_fmt, z_fmt, wrap, heade
         n = st.get("n_companies")
         conf = f"{row.get('benchmark_quality', '')} (peer {n})"
         cells = [
-            (row["ratio"], None), (row["formula"], None),
-            (row["target_value"], ratio_fmt), (st["median"], ratio_fmt),
-            (row["percentile"], z_fmt),
-            (label_ko.get(label, label), label_fmts.get(label)),
-            (astatus, abs_fmts.get(astatus)),
-            (reason_cell, wrap), (conf, None),
+            (row["ratio"], cell), (row["formula"], cell),
+            (row["target_value"], val_fmt), (st["median"], val_fmt),
+            (row["percentile"], pct_fmt),
+            (label_ko.get(label, label), label_fmts.get(label, cell)),
+            (astatus, abs_fmts.get(astatus, cell)),
+            (reason_cell, wrap), (conf, cell),
         ]
         for c, (v, fmt) in enumerate(cells):
             v = _num(v)
             if isinstance(v, float):
-                ws.write_number(r, c, v, fmt) if fmt else ws.write_number(r, c, v)
+                ws.write_number(r, c, v, fmt)
             elif v is None:
-                ws.write_blank(r, c, None, fmt) if fmt else ws.write_blank(r, c, None)
+                ws.write_blank(r, c, None, fmt)
             else:
-                ws.write(r, c, v, fmt) if fmt else ws.write(r, c, v)
+                ws.write(r, c, v, fmt)
         r += 1
     ws.freeze_panes(2, 0)
     ws.autofilter(1, 0, max(1, r - 1), len(FINAL_RATIO_COLUMNS) - 1)
+
+
+def _summary_sheet(ws, *, target, meta, comparison_rows, n_succ, label_ko,
+                   hdr, cell, val_fmt, label_fmts, abs_fmts, banner, note):
+    """Loop 19-A: 첫 시트 '한눈에 보기'. 개요 1줄 + 16비율(비율명·대상값·상대판정·절대판정).
+    위험 신호(절대 경고>주의, 상대 HIGH/LOW)를 위로 정렬. 색은 detail/웹과 동일(INV-8).
+    내부 지표(peer 수·CFS·benchmark_quality)는 넣지 않는다. 값은 detail과 동일(표시 재배치)."""
+    cols = ["비율명", "대상값", "상대판정", "절대판정"]
+    widths = [22, 14, 16, 14]
+    overview = (f"{target.get('corp_name', '')}  ·  업종 {target.get('induty_code', '')}"
+                f"  ·  {meta.get('bsns_year', '')} 사업연도  ·  동종업체 {n_succ}개 비교")
+    ncol = len(cols)
+    ws.merge_range(0, 0, 0, ncol - 1, overview, banner)
+    ws.merge_range(1, 0, 1, ncol - 1,
+                   "검토가 필요한 신호(절대 경고·주의, 상대 높음·낮음)를 위로 정렬했습니다. "
+                   "색은 검토 신호이며 좋음/나쁨(초록·빨강)이 아닙니다.", note)
+    for c, (h, w) in enumerate(zip(cols, widths)):
+        ws.write(2, c, h, hdr)
+        ws.set_column(c, c, w)
+
+    def _rank(row):
+        av = row.get("abs_verdict") or {}
+        astatus = av.get("status")
+        label = row.get("label")
+        if astatus == "경고":
+            return 0
+        if astatus == "주의":
+            return 1
+        if label == "HIGH":
+            return 2
+        if label == "LOW":
+            return 3
+        return 4
+
+    ordered = sorted(comparison_rows, key=_rank)   # stable → 동일 등급 내 원래 순서 유지
+    r = 3
+    for row in ordered:
+        av = row.get("abs_verdict")
+        astatus = av.get("status") if av else "미평가"
+        label = row.get("label")
+        ws.write(r, 0, row.get("ratio", ""), cell)
+        tv = _num(row.get("target_value"))
+        if isinstance(tv, float):
+            ws.write_number(r, 1, tv, val_fmt)
+        else:
+            ws.write_blank(r, 1, None, val_fmt)
+        ws.write(r, 2, label_ko.get(label, label or ""), label_fmts.get(label, cell))
+        ws.write(r, 3, astatus, abs_fmts.get(astatus, cell))
+        r += 1
+    ws.freeze_panes(3, 0)
+    ws.autofilter(2, 0, max(2, r - 1), ncol - 1)
 
 
 def build_final_report_workbook(path: Path, *, target: dict, target_cfs_rows: list[dict],
@@ -637,16 +699,18 @@ def build_final_report_workbook(path: Path, *, target: dict, target_cfs_rows: li
     path = _atomic_new_path(path)
     tmp = path.with_suffix(".xlsx.tmp")
     wb = xlsxwriter.Workbook(str(tmp), {"in_memory": True})
-    bold = wb.add_format({"bold": True, "bg_color": "#DDDDDD", "border": 1})
+    # ---- Loop 19: 정돈 스타일 — 회색 헤더(볼드 제거)·셀 테두리·눈금선 제거·값 서식 통일. 값 불변. ----
+    B = 1
+    hdr = wb.add_format({"bg_color": "#E9EEF4", "border": B, "font_color": "#243040",
+                         "valign": "vcenter", "text_wrap": True})
+    cell = wb.add_format({"border": B, "valign": "top"})
+    wrap = wb.add_format({"border": B, "text_wrap": True, "valign": "top"})
     note = wb.add_format({"italic": True, "font_color": "#8A6D00", "text_wrap": True})
-    wrap = wb.add_format({"text_wrap": True, "valign": "top"})
-    amt = wb.add_format({"num_format": "#,##0"})
-    ratio_fmt = wb.add_format({"num_format": "0.0000"})
-    pct_fmt = wb.add_format({"num_format": "+0.0%;-0.0%;0.0%"})
-    pp_fmt = wb.add_format({"num_format": "+0.00;-0.00;0.00"})      # 비율 %p 차이(값−중앙값)×100
-    turn_fmt = wb.add_format({"num_format": "+0.0000;-0.0000;0.0000"})  # 회전율 값 차이
-    z_fmt = wb.add_format({"num_format": "0.00"})
-    int_fmt = wb.add_format({"num_format": "0"})
+    banner = wb.add_format({"bg_color": "#EEF2F8", "border": B, "font_color": "#16202E",
+                            "bold": True, "valign": "vcenter"})
+    amt = wb.add_format({"num_format": "#,##0", "border": B})
+    val_fmt = wb.add_format({"num_format": "#,##0.00", "border": B})   # 값·배수·비율 2자리 통일
+    pct_fmt1 = wb.add_format({"num_format": "0.0", "border": B})       # percentile 1자리
     label_fmts = _label_formats(wb)
     abs_fmts = _abs_formats(wb)
 
@@ -654,8 +718,16 @@ def build_final_report_workbook(path: Path, *, target: dict, target_cfs_rows: li
     n_succ = sum(1 for r in peer_rows if r["is_target"] == "peer" and r["cfs_fetch_status"] == "성공")
     n_fail = sum(1 for r in peer_rows if r["is_target"] == "peer" and r["cfs_fetch_status"] != "성공")
 
+    # 00_한눈에보기 (Loop 19-A): 첫 시트 = 요약(개요 1줄 + 16비율, 위험 신호 상단 정렬).
+    ws = wb.add_worksheet("00_한눈에보기")
+    ws.hide_gridlines(2)
+    _summary_sheet(ws, target=target, meta=meta, comparison_rows=comparison_rows, n_succ=n_succ,
+                   label_ko=cmp.LABEL_KO, hdr=hdr, cell=cell, val_fmt=val_fmt,
+                   label_fmts=label_fmts, abs_fmts=abs_fmts, banner=banner, note=note)
+
     # 00_README
     ws = wb.add_worksheet("00_README")
+    ws.hide_gridlines(2)
     ws.set_column(0, 0, 24); ws.set_column(1, 1, 104)
     readme = [
         ("문서", f"{target['corp_name']} {meta['bsns_year']} 산업대비 이상징후 리포트 (Ralph Loop 3, 사용자용)"),
@@ -690,19 +762,21 @@ def build_final_report_workbook(path: Path, *, target: dict, target_cfs_rows: li
         readme.append(("절대판정(red flag) 점검 결과",
                        body + ". red flag는 위험 확정이 아니라 검토 경고/점검 신호입니다."))
 
-    ws.write(0, 0, "항목", bold); ws.write(0, 1, "설명", bold)
+    ws.write(0, 0, "항목", hdr); ws.write(0, 1, "설명", hdr)
     for i, (k, v) in enumerate(readme, 1):
-        ws.write(i, 0, k); ws.write(i, 1, v, wrap)
+        ws.write(i, 0, k, cell); ws.write(i, 1, v, wrap)
 
-    # 01_삼성전자_연결재무제표
+    # 01_연결재무제표
     ws = wb.add_worksheet(safe_sheet_name("01_", target["corp_name"], "_연결재무제표"))
+    ws.hide_gridlines(2)
     ws.write(0, 0, f"{target['corp_name']}({target['stock_code']}) {meta['bsns_year']}년 사업보고서 연결재무제표(CFS)", note)
     _add_table(wb, ws, ["재무제표구분", "재무제표명", "계정ID(account_id)", "계정명", "금액", "통화",
                         "접수번호(rcept_no)", "수집시각(retrieved_at)"],
                [[r["sj_div"], r.get("sj_nm") or _SJ_NM_FALLBACK.get(r["sj_div"], ""), r["account_id"],
                  r["account_nm"], r["amount"], r["currency"], r["rcept_no"], r["retrieved_at"]]
                 for r in target_cfs_rows],
-               header_fmt=bold, num_fmt=amt, start_row=2, widths=[12, 16, 34, 30, 20, 8, 16, 26])
+               header_fmt=hdr, num_fmt=amt, start_row=2, widths=[12, 16, 34, 30, 20, 8, 16, 26],
+               text_fmt=cell, blank_fmt=cell)
 
     # 02~05 비율 시트
     by_group = {}
@@ -710,12 +784,14 @@ def build_final_report_workbook(path: Path, *, target: dict, target_cfs_rows: li
         by_group.setdefault(_GROUP_SHEET.get(row["group"]), []).append(row)
     for sheet_name in _SHEET_ORDER:
         ws = wb.add_worksheet(sheet_name)
+        ws.hide_gridlines(2)
         _write_final_ratio_sheet(wb, ws, by_group.get(sheet_name, []),
-                                 ratio_fmt=ratio_fmt, z_fmt=z_fmt, wrap=wrap, header_fmt=bold,
-                                 label_fmts=label_fmts, label_ko=cmp.LABEL_KO, abs_fmts=abs_fmts)
+                                 val_fmt=val_fmt, pct_fmt=pct_fmt1, wrap=wrap, cell=cell, header_fmt=hdr,
+                                 label_fmts=label_fmts, label_ko=cmp.LABEL_KO, abs_fmts=abs_fmts, note=note)
 
     # 06_Peer_List
     ws = wb.add_worksheet("06_Peer_List")
+    ws.hide_gridlines(2)
     ws.write(0, 0, f"업종 {target['induty_code']} / 유효 prefix {target['effective_prefix']} — "
                    f"peer 후보 {n_cand} / CFS 성공 {n_succ} / CFS 실패 {n_fail}", note)
     _add_table(wb, ws, ["기업코드", "기업명", "종목코드", "법인구분(corp_cls)", "업종코드(induty_code)",
@@ -723,36 +799,41 @@ def build_final_report_workbook(path: Path, *, target: dict, target_cfs_rows: li
                [[r["corp_code"], r["corp_name"], r["stock_code"], r["corp_cls"], r["induty_code"],
                  r["acc_mt"], r["is_target"], r["cfs_fetch_status"], r["exclude_reason"]]
                 for r in peer_rows],
-               header_fmt=bold, start_row=1, widths=[12, 24, 10, 16, 18, 10, 10, 18, 30])
+               header_fmt=hdr, start_row=1, widths=[12, 24, 10, 16, 18, 10, 10, 18, 30],
+               text_fmt=cell, blank_fmt=cell)
 
     # 07_Methodology
     ws = wb.add_worksheet("07_Methodology")
-    _methodology_loop3(ws, wb, target, meta, n_cand, n_succ, n_fail, bold, wrap)
+    ws.hide_gridlines(2)
+    _methodology_loop3(ws, wb, target, meta, n_cand, n_succ, n_fail, hdr, cell, wrap)
 
     # 08_계산불가_및_제외사유
     ws = wb.add_worksheet("08_계산불가_및_제외사유")
+    ws.hide_gridlines(2)
     ws.write(0, 0, "NOT_COMPUTABLE / INSUFFICIENT_PEERS / INSUFFICIENT_VARIANCE / CFS 실패 사유 모음", note)
     _add_table(wb, ws, ["구분", "대상", "항목", "사유"],
                [[e["kind"], e["who"], e["item"], e["reason"]] for e in excluded_summary],
-               header_fmt=bold, start_row=1, widths=[24, 24, 20, 70])
+               header_fmt=hdr, start_row=1, widths=[24, 24, 20, 70], text_fmt=cell, blank_fmt=cell)
 
     # 09_제한적_peer_비교 (Ralph Loop 6): sparse 비율이 있을 때만 추가.
     # 충분 peer target(sparse 없음)은 미생성 → 기존 9시트 구조 그대로 유지.
     if sparse_comparison:
         ws = wb.add_worksheet("09_제한적_peer_비교")
-        _write_sparse_peer_sheet(wb, ws, sparse_comparison, bold=bold, wrap=wrap, note=note,
-                                 ratio_fmt=ratio_fmt, min_peers=int(meta.get("min_peers", 5)))
+        ws.hide_gridlines(2)
+        _write_sparse_peer_sheet(wb, ws, sparse_comparison, hdr=hdr, wrap=wrap, cell=cell, note=note,
+                                 val_fmt=val_fmt, min_peers=int(meta.get("min_peers", 5)))
 
     wb.close()
     os.replace(tmp, path)
     return path
 
 
-def _write_sparse_peer_sheet(wb, ws, sparse_rows, *, bold, wrap, note, ratio_fmt, min_peers):
+def _write_sparse_peer_sheet(wb, ws, sparse_rows, *, hdr, wrap, cell, note, val_fmt, min_peers):
     """09_제한적_peer_비교 시트: peer<min_peers 비율의 참고용 직접 비교(통계 benchmark 아님).
 
     실제 peer 회사명을 컬럼(f"{corp_name} 값")으로 표시한다(익명 Peer 1/2 금지). 색상으로
     좋고 나쁨을 암시하지 않는다(label 서식 미사용). 값이 없는 peer는 빈칸으로 둔다.
+    Loop 19: 셀 테두리·회색 헤더(값 불변, 표시 서식만).
     """
     from collections import Counter
     warn = (f"이 시트는 동종산업 상장 CFS peer 수가 최소 benchmark 기준(min_peers={min_peers})에 "
@@ -776,7 +857,7 @@ def _write_sparse_peer_sheet(wb, ws, sparse_rows, *, bold, wrap, note, ratio_fmt
 
     ws.merge_range(0, 0, 0, max(0, len(headers) - 1), warn, note)
     for c, h in enumerate(headers):
-        ws.write(1, c, h, bold)
+        ws.write(1, c, h, hdr)
 
     ws.set_column(0, 0, 12); ws.set_column(1, 1, 16); ws.set_column(2, 2, 16)
     ws.set_column(3, 4, 14)
@@ -789,24 +870,24 @@ def _write_sparse_peer_sheet(wb, ws, sparse_rows, *, bold, wrap, note, ratio_fmt
     def _wnum(r, c, v):
         v = _num(v)
         if v is None:
-            ws.write_blank(r, c, None)
+            ws.write_blank(r, c, None, cell)
         else:
-            ws.write_number(r, c, float(v), ratio_fmt)
+            ws.write_number(r, c, float(v), val_fmt)
 
     r = 2
     for row in sparse_rows:
         pv = {p["corp_name"]: p["value"] for p in row["peer_company_values"] if p.get("corp_name")}
-        ws.write(r, 0, row["group"])
-        ws.write(r, 1, row["ratio_name_ko"])
-        ws.write(r, 2, row["target_company"])
+        ws.write(r, 0, row["group"], cell)
+        ws.write(r, 1, row["ratio_name_ko"], cell)
+        ws.write(r, 2, row["target_company"], cell)
         _wnum(r, 3, row["target_value"])
-        ws.write_number(r, 4, int(row["peer_count"]))
+        ws.write_number(r, 4, int(row["peer_count"]), cell)   # 정수 개수 → General(테두리만)
         for i, n in enumerate(peer_names):
             _wnum(r, 5 + i, pv.get(n))
         _wnum(r, t0, row["peer_median_reference"])
-        ws.write(r, t0 + 1, row["target_rank_among_peers"] or "판정 보류(비교 불가)")
-        ws.write(r, t0 + 2, row["sample_status"])
-        ws.write(r, t0 + 3, "아니오(참고 비교)")
+        ws.write(r, t0 + 1, row["target_rank_among_peers"] or "판정 보류(비교 불가)", cell)
+        ws.write(r, t0 + 2, row["sample_status"], cell)
+        ws.write(r, t0 + 3, "아니오(참고 비교)", cell)
         ws.write(r, t0 + 4, row["comparison_note"], wrap)
         ws.write(r, t0 + 5, row["basis"], wrap)
         r += 1
@@ -814,7 +895,7 @@ def _write_sparse_peer_sheet(wb, ws, sparse_rows, *, bold, wrap, note, ratio_fmt
     ws.autofilter(1, 0, max(1, r - 1), len(headers) - 1)
 
 
-def _methodology_loop3(ws, wb, target, meta, n_cand, n_succ, n_fail, bold, wrap):
+def _methodology_loop3(ws, wb, target, meta, n_cand, n_succ, n_fail, hdr, cell, wrap):
     ws.set_column(0, 0, 26); ws.set_column(1, 1, 100)
     k = meta.get("iqr_fence_k", 1.5)
     mp = meta.get("min_peers", 5)
@@ -836,9 +917,9 @@ def _methodology_loop3(ws, wb, target, meta, n_cand, n_succ, n_fail, bold, wrap)
         ("비교가능성 한계", "대상 회사와 산업 peer 간 사업 구성·규모 차이로 단일 induty_code peer benchmark와 비교가능성 한계가 있을 수 있음."),
         ("추적성", "모든 값은 rcept_no/account_id/request_hash/raw snapshot으로 추적. pool 구성원은 benchmark_debug의 01 시트에 corp_code로 명시."),
     ]
-    ws.write(0, 0, "항목", bold); ws.write(0, 1, "설명", bold)
+    ws.write(0, 0, "항목", hdr); ws.write(0, 1, "설명", hdr)
     for i, (kk, v) in enumerate(lines, 1):
-        ws.write(i, 0, kk); ws.write(i, 1, v, wrap)
+        ws.write(i, 0, kk, cell); ws.write(i, 1, v, wrap)
 
 
 def build_benchmark_debug_workbook(path: Path, *, target: dict, comparison_rows: list[dict],

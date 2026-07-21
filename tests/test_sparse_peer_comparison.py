@@ -156,9 +156,10 @@ def test_backward_compat_default_no_sparse_sheet(tmp_path):
     wb = openpyxl.load_workbook(str(p), read_only=True)
     names = wb.sheetnames
     wb.close()
-    assert names == ["00_README", "01_테스트회사_연결재무제표", "02_수익성", "03_안정성_재무구조",
-                     "04_운전자본_계정리스크", "05_회전율", "06_Peer_List", "07_Methodology",
-                     "08_계산불가_및_제외사유"]
+    # Loop 19: 첫 시트로 '00_한눈에보기' 요약 신설(표시 layer). 나머지 구조/이름은 불변.
+    assert names == ["00_한눈에보기", "00_README", "01_테스트회사_연결재무제표", "02_수익성",
+                     "03_안정성_재무구조", "04_운전자본_계정리스크", "05_회전율", "06_Peer_List",
+                     "07_Methodology", "08_계산불가_및_제외사유"]
 
 
 def test_runner_summary_has_sparse_columns():

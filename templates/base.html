@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}DARTLens — 동종산업대비 재무 이상징후 분석기{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+  <header class="dl-header">
+    <a class="dl-brand" href="{{ url_for('index') }}">
+      <span class="dl-logobox" aria-hidden="true">
+        <!-- 렌즈(돋보기) 아이콘 -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10.5" cy="10.5" r="6.5"></circle>
+          <line x1="15.5" y1="15.5" x2="21" y2="21"></line>
+        </svg>
+      </span>
+      <span class="dl-wordmark">
+        <b>DART<span class="dl-accent">Lens</span></b>
+        <span>동종산업대비 재무 이상징후 분석기</span>
+      </span>
+    </a>
+    <div class="dl-header-actions">{% block header_actions %}{% endblock %}</div>
+  </header>
+
+  {% block body %}
+  <main class="dl-main">
+    {% block content %}{% endblock %}
+  </main>
+  {% endblock %}
+
+  <footer class="dl-foot">
+    <p>본 도구의 HIGH/LOW 표시는 오류·부정의 결론이 아니라 동종산업 peer 대비 추가 검토가 필요한
+       재무비율 후보입니다. NORMAL은 '위험 없음'이 아니라 현재 peer universe·IQR 기준상 이상치로
+       분류되지 않았다는 의미입니다.</p>
+    <p>API Key는 화면·로그·산출물·서버에 저장하지 않습니다(세션 한정). 이 도구는 로컬 전용입니다.</p>
+  </footer>
+</body>
+</html>

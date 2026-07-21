@@ -1,0 +1,67 @@
+{# 표시용 매크로 — 이미 계산된 값을 '읽어' 색·형태로만 표현(값·판정 불변, INV-7).
+   판정 색은 INV-8 준수: HIGH/경고=앰버 · 주의=옅은앰버 · LOW=파랑 · 정상=무채색(초록/빨강 금지). #}
+
+{# 열 이름으로 셀 값 조회(정렬된 columns/row 기준). 없으면 '' . #}
+{% macro cell(row, columns, name) -%}
+{%- for c in columns -%}{%- if c == name -%}{{ row[loop.index0] }}{%- endif -%}{%- endfor -%}
+{%- endmacro %}
+
+{# 상대판정 열 별칭('상대판정' 신 / '판정' 구) 흡수. #}
+{% macro relof(row, columns) -%}
+{%- set a = cell(row, columns, '상대판정') | trim -%}
+{%- if a -%}{{ a }}{%- else -%}{{ cell(row, columns, '판정') | trim }}{%- endif -%}
+{%- endmacro %}
+
+{% macro rel_badge(text) -%}
+{%- set t = (text or '') | trim -%}
+{%- set cls = {'산업 대비 높음':'amber','산업 대비 낮음':'blue','정상 범위':'neutral',
+               'peer 부족':'gray','분포 부족':'gray','계산 불가':'gray'}.get(t, 'gray') -%}
+{%- if t %}<span class="badge {{ cls }}" title="상대판정(동종산업 대비)">{{ t }}</span>{% endif -%}
+{%- endmacro %}
+
+{% macro abs_badge(text) -%}
+{%- set t = (text or '') | trim -%}
+{%- set cls = {'경고':'amber','주의':'soft','정상':'neutral','해당없음':'gray','미평가':'gray'}.get(t, 'gray') -%}
+{%- if t and t in ('경고','주의') %}<span class="badge {{ cls }}" title="절대판정(red flag)">⚑ {{ t }}</span>
+{%- elif t %}<span class="badge {{ cls }} badge-mini" title="절대판정(red flag)">{{ t }}</span>{% endif -%}
+{%- endmacro %}
+
+{# 재무비율 한 항목 라인. tone ∈ {risk, info, normal} 로 강조/흐림 제어. #}
+{% macro ratio_row(row, columns, tone) -%}
+{%- set name = cell(row, columns, '비율명') | trim -%}
+{%- set val  = cell(row, columns, '대상회사 값') | trim -%}
+{%- set med  = cell(row, columns, '산업 중앙값') | trim -%}
+{%- set pct  = cell(row, columns, '산업 내 위치(percentile)') | trim -%}
+{%- set rel  = relof(row, columns) -%}
+{%- set absr = cell(row, columns, '절대판정(red flag)') | trim -%}
+<div class="dl-ratio tone-{{ tone }}">
+  <div class="rt-left">
+    <div class="rt-name">{{ name }}</div>
+    <div class="rt-metrics">
+      {% if val %}<span>대상값 <b>{{ val }}</b></span>{% endif %}
+      {% if med %}<span>산업중앙 <b>{{ med }}</b></span>{% endif %}
+      {% if pct %}<span>산업 내 위치 <b>{{ pct }}</b></span>{% endif %}
+    </div>
+  </div>
+  <div class="rt-badges">{{ rel_badge(rel) }}{{ abs_badge(absr) }}</div>
+</div>
+{%- endmacro %}
+
+{# 일반 표(peer/제외/sparse) — 값 그대로 출력, 스타일만. #}
+{% macro render_table(table, caption='') -%}
+  {% if caption %}<div class="dl-tcap">{{ caption }}</div>{% endif %}
+  {% if table.note %}
+    <p class="dl-note">{{ table.note }}</p>
+  {% elif table.rows %}
+    <div class="dl-tablewrap">
+      <table class="dl-table">
+        <thead><tr>{% for c in table.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for row in table.rows %}<tr>{% for x in row %}<td>{{ x }}</td>{% endfor %}</tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="dl-note">표시할 데이터가 없습니다.</p>
+  {% endif %}
+{%- endmacro %}
