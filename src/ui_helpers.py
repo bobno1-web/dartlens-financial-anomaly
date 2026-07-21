@@ -21,26 +21,6 @@ RATIO_TAB_SHEETS = {
 }
 RATIO_SHEETS = list(RATIO_TAB_SHEETS.values())
 
-# 판정(한글) -> 표시 색상(초록/빨강 금지). HIGH=주황, LOW=파랑, 그 외 회색계열.
-LABEL_COLORS = {
-    "정상 범위": ("#F5F5F5", "#424242"),
-    "산업 대비 높음": ("#FFE0B2", "#E65100"),
-    "산업 대비 낮음": ("#BBDEFB", "#0D47A1"),
-    "peer 부족": ("#E0E0E0", "#616161"),
-    "계산 불가": ("#E0E0E0", "#616161"),
-    "분포 부족": ("#E0E0E0", "#616161"),
-}
-
-# Loop 15: 절대판정(red flag) 색상 — danger red 미사용(점검 신호이지 위험 확정 아님). 앰버/노랑/회색.
-ABS_COLORS = {
-    "경고": ("#FFD180", "#5D4037"),
-    "주의": ("#FFF3C4", "#6D4C41"),
-    "정상": ("#F5F5F5", "#424242"),
-    "해당없음": ("#FAFAFA", "#9E9E9E"),
-    "미평가": ("#FFFFFF", "#BDBDBD"),
-}
-
-
 # --------------------------------------------------------------------------
 # 파일 탐지 (읽기 전용, .tmp·중간 실패 파일 무시)
 # --------------------------------------------------------------------------
@@ -296,33 +276,8 @@ def build_interpretation(final_path) -> list[str]:
 
 
 # --------------------------------------------------------------------------
-# 표 스타일 / 다운로드
+# 다운로드
 # --------------------------------------------------------------------------
-def style_ratio_df(df: pd.DataFrame):
-    """상대판정·절대판정 열에 색상 적용. 초록/빨강(좋음·나쁨) 미사용; red flag는 앰버/노랑."""
-    jcol = _first_col(df, "상대판정", "판정")
-    acol = _first_col(df, "절대판정(red flag)")
-    if jcol is None and acol is None:
-        return df
-
-    def _row_style(row):
-        styles = []
-        for col in df.columns:
-            if col == jcol:
-                bg, fg = LABEL_COLORS.get(str(row.get(jcol, "")), ("", ""))
-            elif col == acol:
-                bg, fg = ABS_COLORS.get(str(row.get(acol, "")), ("", ""))
-            else:
-                bg = fg = ""
-            styles.append(f"background-color: {bg}; color: {fg}" if bg else "")
-        return styles
-
-    try:
-        return df.style.apply(_row_style, axis=1)
-    except Exception:
-        return df
-
-
 def prepare_download(path):
     """(파일명, bytes) 반환. 읽기 전용."""
     p = Path(path)
