@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}API 키 입력 · 1/2 단계 — DARTLens{% endblock %}
+{% block content %}
+
+<div class="dl-flow">
+  <div class="dl-flow-head">
+    <span class="dl-flow-dots"><i class="dl-dot on"></i><i class="dl-dot"></i></span>
+    <span class="dl-flow-badge">1 / 2 단계</span>
+  </div>
+
+  <h1>먼저 API 키를 입력하세요</h1>
+  <p class="dl-sub">OpenDART에서 <b>무료로 발급</b>받은 인증키가 필요합니다. 입력한 키는 이 세션에서만
+     사용하며, 파일·로그·산출물·화면에 저장하지 않습니다.</p>
+
+  {% if error %}<div class="dl-alert dl-alert-warn">{{ error }}</div>{% endif %}
+
+  <div class="dl-card">
+    {% if env_key %}
+      <div class="dl-keyset">.env에 저장된 키를 사용합니다. 다른 키로 진행하려면 아래에 입력하세요(선택).</div>
+    {% elif key_set %}
+      <div class="dl-keyset">이 세션에 키가 설정되어 있습니다. 변경하려면 아래에 새 키를 입력하세요(선택).</div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('apikey_submit') }}" class="dl-flow-fields">
+      <div class="dl-field">
+        <label for="api_key">OpenDART API Key
+          {% if env_key or key_set %}<span class="hint">선택 · 비우면 기존 키 유지</span>{% endif %}</label>
+        <input id="api_key" type="password" name="api_key" value="" autocomplete="off"
+               placeholder="세션에만 사용 · 저장하지 않습니다"
+               autofocus {% if not (env_key or key_set) %}required{% endif %}>
+      </div>
+      <div class="dl-flow-actions">
+        <a href="{{ url_for('index') }}" class="dl-btn">취소</a>
+        <button type="submit" class="dl-btn dl-btn-primary">다음</button>
+      </div>
+    </form>
+  </div>
+
+  <p class="dl-flow-note">키가 없으신가요? OpenDART(opendart.fss.or.kr)에서 몇 분 만에 무료로 발급받을 수 있습니다.</p>
+</div>
+
+{% endblock %}

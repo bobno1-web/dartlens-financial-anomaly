@@ -23,12 +23,45 @@ def test_healthz_ok():
     assert r.get_json() == {"status": "ok"}
 
 
-def test_landing_renders_form():
+def test_landing_has_cta_no_form():
+    """Loop 22: 랜딩은 입력폼을 두지 않는다(폼은 2단계로 이동). CTA로 흐름에 진입한다."""
     r = _client().get("/")
     assert r.status_code == 200
     body = r.get_data(as_text=True)
-    # 문구(20-B: '분석 시작하기')가 아니라 폼 필드 존재로 검증 → 디자인 카피 변경에 견고.
+    assert 'name="company"' not in body          # 랜딩에 회사 입력폼 없음
+    assert "/apikey" in body                      # CTA → 1단계
+    assert "분석 시작하기" in body
+
+
+def test_apikey_skips_when_key_in_session():
+    """API 키 세션 유지: 세션에 키가 있으면 GET /apikey 는 2단계(/company)로 건너뛴다
+    (재조회 시 키 재입력 불필요)."""
+    c = _client()
+    c.post("/apikey", data={"api_key": "dummy-session-key"})   # 엔진 미호출, 세션 저장만
+    r = c.get("/apikey")                                        # follow_redirects=False
+    assert r.status_code == 302
+    assert "/company" in r.headers.get("Location", "")
+
+
+def test_company_step_shows_form_after_key():
+    """키가 세션에 있으면 2단계에서 회사/연도 폼이 렌더된다."""
+    c = _client()
+    c.post("/apikey", data={"api_key": "dummy-session-key"})
+    r = c.get("/company")
+    assert r.status_code == 200
+    body = r.get_data(as_text=True)
     assert 'name="company"' in body and 'name="year"' in body
+
+
+def test_back_preserves_inputs():
+    """뒤로가기 입력값 보존: /company/back 로 저장한 회사/연도가 이후 /company 프리필에 반영된다."""
+    c = _client()
+    c.post("/apikey", data={"api_key": "dummy-session-key"})
+    c.post("/company/back", data={"company": "태영건설", "year": "2024"})  # 미제출 입력 보존
+    r = c.get("/company")
+    body = r.get_data(as_text=True)
+    assert 'value="태영건설"' in body           # 회사명 프리필
+    assert '<option value="2024" selected' in body  # 연도 프리필
 
 
 def test_download_rejects_traversal_and_missing():

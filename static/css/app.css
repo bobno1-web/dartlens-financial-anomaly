@@ -240,8 +240,35 @@ a { color: inherit; }
 .dl-foot { max-width: 1080px; margin: 0 auto; padding: 1.4rem 1.5rem 2.4rem; color: var(--ink-3); font-size: .78rem; border-top: 1px solid var(--line); }
 .dl-foot p { margin: .3rem 0; }
 
+/* ── 단계형 입력 흐름 (Loop 22: 랜딩 CTA → 1/2 키 → 2/2 회사 → 결과) ──────── */
+/* 랜딩 히어로: 여백을 크게(웨일식 시원함). 로고는 좌상단 헤더(.dl-header) 유지. */
+.dl-hero-lg { padding: 4.4rem 1rem 1.2rem; }
+.dl-cta { margin-top: 2rem; }
+.dl-cta .dl-btn-lg { padding: .9rem 2.2rem; }
+
+/* 좁은 단일 컬럼 카드(키/회사 입력 단계) — 가운데 정렬, 위 여백 넉넉히. */
+.dl-flow { max-width: 468px; margin: 0 auto; padding: 3rem 0 1.5rem; }
+.dl-flow-head { display: flex; align-items: center; gap: .7rem; margin-bottom: 1.15rem; }
+.dl-flow-dots { display: inline-flex; gap: .34rem; }
+.dl-flow-dots .dl-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--line); }
+.dl-flow-dots .dl-dot.on { background: var(--charcoal); }
+.dl-flow-badge { font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.dl-flow h1 { font-size: clamp(1.45rem, 3.4vw, 1.85rem); font-weight: 800; letter-spacing: -.02em;
+  color: var(--charcoal); margin: 0 0 .5rem; line-height: 1.22; }
+.dl-flow > .dl-sub { color: var(--ink-2); font-size: .92rem; margin: 0 0 1.35rem; line-height: 1.62; }
+.dl-flow > .dl-sub b { color: var(--ink); font-weight: 600; }
+.dl-flow .dl-card { padding: 1.5rem 1.5rem; }
+.dl-flow-fields { display: flex; flex-direction: column; gap: 1.05rem; }
+.dl-flow-actions { display: flex; align-items: center; gap: .7rem; margin-top: 1.5rem; }
+.dl-flow-actions .dl-btn-primary { flex: 1; }
+.dl-flow-note { font-size: .79rem; color: var(--ink-3); margin: 1rem 0 0; line-height: 1.55; }
+.dl-keyset { display: flex; align-items: flex-start; gap: .5rem; font-size: .85rem; color: var(--ink-2);
+  background: #f3f1ec; border: 1px solid var(--line); border-radius: 10px; padding: .7rem .9rem; margin-bottom: 1.15rem; }
+
 /* ── 반응형 (모바일: 카드 세로 스택, 표 스크롤) ───────────────────────── */
 @media (max-width: 760px) {
+  .dl-hero-lg { padding: 2.6rem .5rem 1rem; }
+  .dl-flow { padding: 2rem 0 1rem; }
   /* minmax(0,1fr): 트랙 최소폭을 0으로 둬 긴 소수 토큰이 카드를 뷰포트 밖으로 밀지 않게 함(가로 스크롤 방지). */
   .dl-steps { grid-template-columns: minmax(0, 1fr); }
   .dl-summary { grid-template-columns: minmax(0, 1fr); }

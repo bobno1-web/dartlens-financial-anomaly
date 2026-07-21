@@ -117,6 +117,19 @@ def list_recent(limit: int = 12) -> list[dict]:
     return uih.list_report_candidates(OUTPUT_DIR, limit=limit)
 
 
+def env_key_present() -> bool:
+    """OpenDART 키가 .env/환경에서 해석 가능한지 여부만 반환한다.
+
+    키 '값'은 절대 반환·로그하지 않는다(가용성 boolean만). 입력 흐름에서 1단계(키 입력)를
+    건너뛸지 판단하는 용도. config.get_api_key()는 키가 없으면 ConfigError를 올린다.
+    """
+    try:
+        config.get_api_key()
+        return True
+    except Exception:  # noqa: BLE001 — 키 부재/설정 오류는 '없음'으로 처리(값 미노출)
+        return False
+
+
 def resolve_download(filename: str) -> Path | None:
     """다운로드 요청 basename 을 output 폴더 내부의 실제 .xlsx 로만 해석(경로 이탈 차단).
 

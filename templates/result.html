@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m %}
 {% block title %}{{ r.company }} · {{ r.year }} — DARTLens 분석 결과{% endblock %}
-{% block header_actions %}<a href="{{ url_for('index') }}">＋ 새 조회</a>{% endblock %}
+{% block header_actions %}<a href="{{ url_for('company') }}">＋ 새 조회</a>{% endblock %}
 {% block content %}
 
 {# ── 집계(읽기 전용): 절대 경고/주의·산업 대비 특이·표본제한·정상 건수 ── #}
@@ -153,7 +153,7 @@
     {% if r.debug_name %}
       <a class="dl-btn" href="{{ url_for('download', file=r.debug_name) }}">benchmark_debug Excel</a>
     {% endif %}
-    <a class="dl-btn" href="{{ url_for('index') }}">새 분석</a>
+    <a class="dl-btn" href="{{ url_for('company') }}">새 분석</a>
   </div>
 </section>
 
