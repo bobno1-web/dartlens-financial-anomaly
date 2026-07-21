@@ -94,27 +94,25 @@ OpenDART 공시 데이터 기반 · **로컬 Flask 웹 분석 도구**
 
 > **이자보상배율**은 표준 재무제표에 순수 이자비용 라인이 있는 회사(예: 대한항공)만 계산되고, 없으면 NOT_COMPUTABLE입니다(혼합계정 금융비용으로 대체하지 않음). 그래서 대부분 15/16, 대한항공만 13/16입니다. **CJ제일제당·한화솔루션은 상대판정이 대부분 정상이어도 절대 기준으로는 유동성 경고가 잡힙니다** — 상대·절대 두 축이 서로를 보완합니다.
 
-**① 첫 화면 — 회사·연도 입력** (API Key 칸은 빈 값·마스킹, 저장하지 않음)
+화면 흐름은 **랜딩 → API 키(1/2) → 회사·연도(2/2) → 결과**의 단계형입니다.
+
+**① 랜딩** — 무엇을 하는 도구인지 먼저 보여주고, 입력은 다음 단계로 넘깁니다(로고 좌상단).
 
 ![DARTLens 랜딩 화면](docs/screenshots/dartlens_landing.png)
 
-**② 검토 후보를 잡아내는 장면 — 한화솔루션 2025**
-peer 49개(CFS 성공 42) 중 **재고자산비율만 산업 상단 fence 초과 = HIGH 1건**, 나머지 11개는 NORMAL.
-→ 동종산업 대비 특이한 비율을 **검토 후보**로 선별하는 장면입니다.
+**② 입력 1/2 — OpenDART API 키** — 세션에만 사용하고 파일·로그·산출물·화면에 저장하지 않습니다. `.env`에 키가 있으면 이 단계는 자동으로 건너뜁니다.
 
-![DARTLens 결과 요약 — 한화솔루션 HIGH 1건](docs/screenshots/dartlens_result_summary.png)
+![DARTLens 입력 1단계 — API 키](docs/screenshots/dartlens_step1_apikey.png)
 
-**③ peer 부족을 정직하게 처리하는 장면 — 현대자동차 2025**
-동종 peer가 3개뿐(`min_peers=5` 미만)이라 통계 benchmark가 성립하지 않음.
-→ 억지로 HIGH/LOW를 만들지 않고 **INSUFFICIENT_PEERS로 보류**, `09_제한적_peer_비교` 시트에서 **실제 peer 회사명으로 직접 비교**를 제공하는 장면입니다.
+**③ 입력 2/2 — 회사·연도** — 회사명 또는 6자리 종목코드와 사업연도를 입력합니다. peer가 부족한 산업은 통계 판정을 보류하고 실제 peer와의 참고 비교로 표시합니다.
 
-![DARTLens sparse peer 안내 — 현대자동차](docs/screenshots/dartlens_sparse_peer_notice.png)
+![DARTLens 입력 2단계 — 회사/연도](docs/screenshots/dartlens_step2_company.png)
 
-**④ 상대비교로는 못 잡는 절대 부실 신호 — 태영건설 2025** (건설업, peer 14)
+**④ 결과 — 태영건설 2025** (건설업, peer 14)
 건설업 peer 대비로는 **유동비율·운전자본이 "정상 범위"**(상대판정)입니다. 그러나 절대 기준으로는 **유동비율 0.67 < 1 → 경고**, **운전자본 음수(−0.36) → 경고**, **부채비율 542% → 주의**가 동시에 잡힙니다.
-→ **동종산업 대비로는 평범해도, 절대 기준으로는 부실 신호를 잡는** 장면입니다(red flag는 검토 경고이며 위험 확정이 아닙니다).
+→ **동종산업 대비로는 평범해도, 절대 기준으로는 부실 신호를 잡는** 장면입니다(red flag는 검토 경고이며 위험 확정이 아닙니다). 위 표의 한화솔루션(재고자산비율 HIGH 1)·현대자동차(peer 부족 → INSUFFICIENT_PEERS 보류) 등 다른 예시도 동일 흐름으로 확인할 수 있습니다.
 
-![DARTLens 절대판정 red flag — 태영건설](docs/screenshots/dartlens_redflag_taeyoung.png)
+![DARTLens 결과 — 태영건설 red flag](docs/screenshots/dartlens_result.png)
 
 > 삼성전자는 상대·절대 판정이 모두 깨끗합니다. "전부 NORMAL"은 "안전 확정"이 아니라 **현재 peer universe·IQR 기준에서 이상치로 분류되지 않았다**는 의미이며, CJ제일제당처럼 상대판정이 정상이어도 절대 red flag(유동성 경고)가 잡히는 경우가 있습니다.
 

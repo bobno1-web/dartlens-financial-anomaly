@@ -10,8 +10,8 @@
   - ★로컬 전용 도구(app_flask.py 가 127.0.0.1 로만 바인딩).
 
 이 모듈이 하는 일: (1) run_analysis — 엔진 호출 후 산출된 Excel을 읽어 표시용 dict 구성,
-(2) read_report — 기존 리포트(basename)를 읽어 동일 표시용 dict 구성, (3) list_recent —
-output 폴더의 최근 리포트 목록, (4) resolve_download — 다운로드 대상 경로 안전 검증.
+(2) read_report — 기존 리포트(basename)를 읽어 동일 표시용 dict 구성, (3) resolve_download —
+다운로드 대상 경로 안전 검증, (4) env_key_present — .env 키 가용성 boolean(값 미노출).
 """
 from __future__ import annotations
 
@@ -110,13 +110,10 @@ def run_analysis(company: str, year, api_key: str | None = None) -> dict:
 
 
 # --------------------------------------------------------------------------
-# 최근 산출물 목록 / 다운로드 경로 안전 검증
+# 다운로드 경로 안전 검증 / 키 가용성
+# (list_recent 는 Loop 22에서 랜딩의 '최근 산출물' 목록 제거와 함께 미사용이 되어 삭제.
+#  최신탐지 원본 함수 uih.list_report_candidates 는 그대로 보존 — 테스트가 사용.)
 # --------------------------------------------------------------------------
-def list_recent(limit: int = 12) -> list[dict]:
-    """output 폴더의 최근 리포트 후보(회사·연도·timestamp·파일명). 읽기 전용, 파일명만으로 판별."""
-    return uih.list_report_candidates(OUTPUT_DIR, limit=limit)
-
-
 def env_key_present() -> bool:
     """OpenDART 키가 .env/환경에서 해석 가능한지 여부만 반환한다.
 
