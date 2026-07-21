@@ -17,10 +17,21 @@ def _read(name):
 def test_bat_exists_and_launches_flask():
     assert (ROOT / "run_app.bat").exists()
     t = _read("run_app.bat")
-    assert "python app_flask.py" in t            # 올바른 실행 명령(Flask)
+    assert "%PYCMD% app_flask.py" in t           # 올바른 실행 명령(Flask, python/py 자동선택)
     assert "%~dp0" in t                          # 스크립트 위치 기준으로 루트 이동
     assert "pause" in t.lower()                  # 오류 시 창 유지
     assert "app_flask.py" in t                   # app_flask.py 존재 확인 로직
+
+
+def test_bat_is_ascii_only():
+    """Loop 21 회귀 가드: run_app.bat 은 ASCII 전용이어야 한다.
+    한글 등 멀티바이트가 들어가면 한국어 Windows(OEM CP949)에서 cmd.exe 가 chcp 65001 이후
+    배치 파일의 바이트 위치를 잃고 라인을 오파싱한다 → echo 가 떨어져 나가 requirements.txt 가
+    메모장으로 열리거나 'org' 류 미인식 명령 오류가 난다(사람 보고 증상). 메시지는 ASCII로 유지하고
+    한국어 콘솔 출력은 app_flask.py(파이썬 stdout + chcp 65001)에 맡긴다."""
+    raw = (ROOT / "run_app.bat").read_bytes()
+    nonascii = [b for b in raw if b > 0x7F]
+    assert not nonascii, f"run_app.bat 에 비ASCII 바이트 {len(nonascii)}개 — 더블클릭 실행 깨짐 위험"
 
 
 def test_bat_does_not_touch_env_or_print_key():
@@ -35,7 +46,7 @@ def test_ps1_if_present_launches_flask_and_is_key_safe():
         return  # .ps1은 선택 구현
     t = p.read_text(encoding="utf-8", errors="replace")
     low = t.lower()
-    assert "python app_flask.py" in t
+    assert "app_flask.py" in t                   # Flask 앱 기동(python/py 자동선택: `& $PY app_flask.py`)
     assert ".env" not in low and "opendart_api_key" not in low
 
 

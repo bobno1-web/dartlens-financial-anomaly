@@ -10,19 +10,21 @@ if (-not (Test-Path "app_flask.py")) {
     Read-Host "Press Enter to exit"; exit 1
 }
 
-# Python check (no secret / API key access)
-$null = (Get-Command python -ErrorAction SilentlyContinue)
-if (-not $?) {
+# Pick a Python launcher: prefer python, fall back to the py launcher (no secret / API key access)
+$PY = $null
+if (Get-Command python -ErrorAction SilentlyContinue) { $PY = "python" }
+elseif (Get-Command py -ErrorAction SilentlyContinue) { $PY = "py" }
+if (-not $PY) {
     Write-Host "[ERROR] Python not found. Install Python 3, then: python -m pip install -r requirements.txt" -ForegroundColor Red
     Read-Host "Press Enter to exit"; exit 1
 }
 
 # Flask check (no auto-install)
-python -c "import flask" 2>$null
+& $PY -c "import flask" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "[INFO] Flask not installed. First run: python -m pip install -r requirements.txt" -ForegroundColor Yellow
+    Write-Host "[INFO] Flask not installed. First run: $PY -m pip install -r requirements.txt" -ForegroundColor Yellow
     Read-Host "Press Enter to exit"; exit 1
 }
 
 Write-Host "Starting DARTLens (Flask)... a browser tab opens shortly (stop with Ctrl+C)" -ForegroundColor Green
-python app_flask.py
+& $PY app_flask.py
