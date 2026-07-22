@@ -4,7 +4,8 @@
 {% block header_actions %}<a href="{{ url_for('company') }}">＋ 새 조회</a>{% endblock %}
 {% block content %}
 
-{# ── 집계(읽기 전용): 절대 경고/주의·산업 대비 특이·표본제한·정상 건수 ── #}
+{# ── 집계(읽기 전용): 엔진 라벨을 상호배타 우선순위로 분류(경고>주의>높음/낮음>표본·계산제한>정상).
+   화면 3종 신호 = 절대 주의(경고+주의) · 산업 대비 특이(높음+낮음) · 판정 불가(표본·계산제한). 값 불변(INV-7). ── #}
 {% set cnt = namespace(warn=0, caution=0, special=0, info=0, normal=0) %}
 {% for g in r.groups %}{% for row in g.rows %}
   {%- set absr = m.cell(row, g.columns, '절대판정(red flag)') | trim -%}
@@ -15,9 +16,6 @@
   {% elif rel in ('peer 부족', '분포 부족', '계산 불가') %}{% set cnt.info = cnt.info + 1 %}
   {% else %}{% set cnt.normal = cnt.normal + 1 %}{% endif %}
 {% endfor %}{% endfor %}
-{# HIGH/LOW '업종 대비 특이' 지표는 엔진 라벨 분포(label_counts)를 그대로 집계 — 정렬 tier와 무관하게
-   실제 상대판정 건수를 반영(예: 절대 주의이면서 동시에 HIGH인 비율도 특이 건수에 포함). #}
-{% set highlow = r.summary.label_counts.get('산업 대비 높음', 0) + r.summary.label_counts.get('산업 대비 낮음', 0) %}
 
 {# ── 대상 회사 메타(peer_list의 '대상' 행에서 읽음) ── #}
 {% set tgt = namespace(market='', induty='', stock='') %}
@@ -52,67 +50,91 @@
     <span>사업연도 <b>{{ r.year }}</b></span>
     <span>비교 peer <b>{{ r.summary.peer_candidates if r.summary.peer_candidates is not none else '-' }}</b>사
       (CFS 성공 {{ r.summary.cfs_success if r.summary.cfs_success is not none else '-' }})</span>
+    <span>분석 비율 <b>{{ r.summary.computable_count if r.summary.computable_count is not none else '-' }}/{{ r.summary.total_ratios if r.summary.total_ratios is not none else '-' }}</b></span>
   </div>
 
+  {# ── 3종 신호 요약(읽기 전용): 절대 주의(=절대 경고+주의) · 산업 대비 특이(=높음+낮음) · 판정 불가 ── #}
   <div class="dl-summary">
-    <div class="dl-stat">
-      <div class="k">분석 비율</div>
-      <div class="v">{{ r.summary.computable_count if r.summary.computable_count is not none else '-' }}<small> / {{ r.summary.total_ratios if r.summary.total_ratios is not none else '-' }}</small></div>
-      <div class="s">비교한 재무비율 개수</div>
-    </div>
-    <div class="dl-stat {% if cnt.warn %}is-amber{% endif %}">
-      <div class="k">절대 경고</div>
-      <div class="v">{{ cnt.warn }}</div>
-      <div class="s">업종과 무관하게 위험한 신호</div>
+    <div class="dl-stat {% if cnt.warn or cnt.caution %}is-amber{% endif %}">
+      <div class="k">절대 주의</div>
+      <div class="v">{{ cnt.warn + cnt.caution }}</div>
+      <div class="s">업종과 무관하게 위험 기준을 넘음</div>
     </div>
     <div class="dl-stat">
-      <div class="k">계산 제한</div>
+      <div class="k">산업 대비 특이</div>
+      <div class="v">{{ cnt.special }}</div>
+      <div class="s">같은 업종 대비 유별나게 높거나 낮음</div>
+    </div>
+    <div class="dl-stat">
+      <div class="k">판정 불가</div>
       <div class="v">{{ cnt.info }}</div>
-      <div class="s">데이터 부족으로 판정 보류</div>
+      <div class="s">데이터가 부족해 비교할 수 없음</div>
     </div>
   </div>
 
   <div class="dl-infobox">
-    <b>두 가지 방식으로 봅니다.</b> <b>업종 대비</b>는 같은 업종 회사들과 비교해 높은지/낮은지를,
-    <b>절대 경고</b>는 업종과 상관없이 그 자체로 위험한 기준을 넘었는지를 봅니다.
+    <b>결과를 세 가지 신호로 나눠 봅니다.</b>
+    <b>절대 주의</b>는 업종과 상관없이 그 자체로 위험한 기준을 넘은 항목,
+    <b>산업 대비 특이</b>는 같은 업종 회사들과 비교해 유별나게 높거나 낮은 항목,
+    <b>판정 불가</b>는 데이터가 부족해 비교할 수 없는 항목입니다.
     표시는 결론이 아니라 <b>먼저 검토할 후보</b>입니다.
   </div>
 </section>
 
 <section class="dl-section">
   <h2>먼저 검토할 재무 항목</h2>
-  <p class="dl-sub">위험 신호(절대 경고 · 주의 · 산업 대비 특이)와 계산 제한 항목을 먼저 보여줍니다. 정상 항목은 아래에서 펼쳐볼 수 있습니다.</p>
-  <div class="dl-ratios">
+  <p class="dl-sub">아래 세 가지 신호로 나눠 먼저 보여줍니다(엔진은 세밀히 판정하되 화면은 묶어 표시). 정상 항목은 맨 아래에서 펼쳐볼 수 있습니다.</p>
 
-    {% if cnt.warn %}<div class="dl-tier-label">절대 경고</div>
-      {% for g in r.groups %}{% for row in g.rows %}
-        {% if m.cell(row, g.columns, '절대판정(red flag)')|trim == '경고' %}{{ m.ratio_row(row, g.columns, 'risk') }}{% endif %}
-      {% endfor %}{% endfor %}
-    {% endif %}
+  {# ── 신호 1: 절대 주의 = 절대 경고 + 절대 주의 통합(각 카드 배지는 경고/주의 세밀 구분 그대로) ── #}
+  {% set n_abs = cnt.warn + cnt.caution %}
+  {% if n_abs %}
+    <div class="dl-signal-head">
+      <div class="dl-signal-title">절대 주의 <span class="dl-signal-count is-amber">{{ n_abs }}건</span></div>
+      <p class="dl-signal-desc">업종과 상관없이, 그 자체로 위험한 기준을 넘은 항목</p>
+    </div>
+    {# 한 묶음(절대 주의)이되, 더 센 신호인 '경고'를 위에 두고 '주의'를 아래에 둔다(각 카드 배지로 구분 유지). #}
+    <div class="dl-ratios">
+      {% for sev in ['경고', '주의'] %}{% for g in r.groups %}{% for row in g.rows %}
+        {% if m.cell(row, g.columns, '절대판정(red flag)')|trim == sev %}{{ m.ratio_row(row, g.columns, 'risk') }}{% endif %}
+      {% endfor %}{% endfor %}{% endfor %}
+    </div>
+  {% else %}
+    <div class="dl-signal-head is-none"><div class="dl-signal-title">절대 주의 <span class="dl-signal-none">없음</span></div></div>
+  {% endif %}
 
-    {% if cnt.caution %}<div class="dl-tier-label">절대 주의</div>
-      {% for g in r.groups %}{% for row in g.rows %}
-        {% if m.cell(row, g.columns, '절대판정(red flag)')|trim == '주의' %}{{ m.ratio_row(row, g.columns, 'risk') }}{% endif %}
-      {% endfor %}{% endfor %}
-    {% endif %}
-
-    {% if cnt.special %}<div class="dl-tier-label">산업 대비 특이 (HIGH / LOW)</div>
+  {# ── 신호 2: 산업 대비 특이 = 산업 대비 높음 + 낮음 통합 ── #}
+  {% if cnt.special %}
+    <div class="dl-signal-head">
+      <div class="dl-signal-title">산업 대비 특이 <span class="dl-signal-count">{{ cnt.special }}건</span></div>
+      <p class="dl-signal-desc">같은 업종 회사들과 비교해 유별나게 높거나 낮은 항목</p>
+    </div>
+    <div class="dl-ratios">
       {% for g in r.groups %}{% for row in g.rows %}
         {%- set absr = m.cell(row, g.columns, '절대판정(red flag)')|trim -%}
         {%- set rel = m.relof(row, g.columns)|trim -%}
         {% if absr not in ('경고','주의') and rel in ('산업 대비 높음','산업 대비 낮음') %}{{ m.ratio_row(row, g.columns, 'risk') }}{% endif %}
       {% endfor %}{% endfor %}
-    {% endif %}
+    </div>
+  {% else %}
+    <div class="dl-signal-head is-none"><div class="dl-signal-title">산업 대비 특이 <span class="dl-signal-none">없음</span></div></div>
+  {% endif %}
 
-    {% if cnt.info %}<div class="dl-tier-label">표본 · 계산 제한</div>
+  {# ── 신호 3: 판정 불가 = peer 부족·분포 부족·계산 불가 통합 ── #}
+  {% if cnt.info %}
+    <div class="dl-signal-head">
+      <div class="dl-signal-title">판정 불가 <span class="dl-signal-count is-gray">{{ cnt.info }}건</span></div>
+      <p class="dl-signal-desc">데이터가 부족해 비교할 수 없는 항목</p>
+    </div>
+    <div class="dl-ratios">
       {% for g in r.groups %}{% for row in g.rows %}
         {%- set absr = m.cell(row, g.columns, '절대판정(red flag)')|trim -%}
         {%- set rel = m.relof(row, g.columns)|trim -%}
         {% if absr not in ('경고','주의') and rel in ('peer 부족','분포 부족','계산 불가') %}{{ m.ratio_row(row, g.columns, 'info', reasons=reasons) }}{% endif %}
       {% endfor %}{% endfor %}
-    {% endif %}
-
-  </div>
+    </div>
+  {% else %}
+    <div class="dl-signal-head is-none"><div class="dl-signal-title">판정 불가 <span class="dl-signal-none">없음</span></div></div>
+  {% endif %}
 
   {% if cnt.normal %}
   <details class="dl-normal-fold">
@@ -133,7 +155,21 @@
   <h2>핵심 해석 요약</h2>
   <div class="dl-card">
     <ul style="margin:0;padding-left:1.15rem;color:var(--ink-2);font-size:.9rem;line-height:1.7">
-      {% for line in r.interpretation %}<li>{{ line }}</li>{% endfor %}
+      {# Loop 26: 첫 요약 문장은 화면과 같은 3종 기준으로 재구성(엔진 라벨 불변 — 카운트만 읽어 표시).
+         상세 항목 문장(red flag·신뢰도 등)은 엔진 해석을 그대로 이어 붙인다(첫 6종 카운트 문장만 대체). #}
+      {% if r.summary.total_ratios %}
+        <li>총 {{ r.summary.total_ratios }}개 비율 중
+          {%- if cnt.warn or cnt.caution or cnt.special or cnt.info %}
+          절대 주의 <b>{{ cnt.warn + cnt.caution }}</b> · 산업 대비 특이 <b>{{ cnt.special }}</b> · 판정 불가 <b>{{ cnt.info }}</b>
+          <span style="color:var(--ink-3)">(그 외 정상 {{ cnt.normal }})</span>.
+          {%- else %}
+          모두 현재 peer universe·IQR 기준상 정상 범위입니다(이상치로 분류되지 않음).
+          {%- endif %}
+        </li>
+        {% for line in r.interpretation[1:] %}<li>{{ line }}</li>{% endfor %}
+      {% else %}
+        {% for line in r.interpretation %}<li>{{ line }}</li>{% endfor %}
+      {% endif %}
     </ul>
   </div>
 </section>
@@ -143,7 +179,7 @@
 <section class="dl-section">
   <h2>제한적 peer 참고 비교 <span style="font-size:.85rem;font-weight:500;color:var(--ink-3)">· 09시트 · 통계 판정 보류</span></h2>
   <p class="dl-sub">{{ r.sparse_notice }}</p>
-  {{ m.render_table(r.sparse) }}
+  {{ m.render_sparse_table(r.sparse) }}
 </section>
 {% endif %}
 

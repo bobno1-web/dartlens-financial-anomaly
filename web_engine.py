@@ -102,6 +102,93 @@ def format_ratio_value(raw, ratio_name=None, decimals: int = 2) -> str:
     return text
 
 
+# Loop 26: 비율별 '쉬운 한 줄 설명' — 어려운 회계 용어 대신 그 값이 뜻하는 바를 일상어로 적는다.
+# RATIO_UNIT 과 같은 근거로 **비율명 기준(회사 무관)** 이라 INV-4(회사 하드코딩 금지) 위반이 아니다
+# (16개 비율은 모든 회사 공통). 표시 전용: 엔진이 산출한 값을 '읽어' 말로 풀 뿐, label/판정/값을
+# 만들거나 바꾸지 않는다(INV-7). 방향성 문구(부호·1배·0 기준)는 값과 무관하게 항상 참인 재무 정의만
+# 쓰고, 값이 없으면(계산 불가 등) 그 비율이 '무엇을 재는지'만 설명한다.
+def _finite_float(raw):
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if s == "" or s.lower() == "nan":
+        return None
+    try:
+        f = float(s)
+    except (TypeError, ValueError):
+        return None
+    if f != f or f in (float("inf"), float("-inf")):
+        return None
+    return f
+
+
+def explain_ratio(raw, ratio_name=None) -> str:
+    """비율명+값 → 재무적으로 정확한 한 줄 쉬운 설명(표시 전용, 값·판정 불변). 미등록 비율은 ''.
+
+    ★부호 기반 문구의 항상-참 전제(cr1 지적, Loop 26): ROE<0="손실"·부채비율 "배" 등은
+    분모가 항상 양수일 때만 성립한다. 엔진이 `src/ratio_input.py`의 `d_val <= 0 → invalid_denominator`
+    가드로 비양수 분모를 NOT_COMPUTABLE(계산 불가)로 배제하므로, 계산된 비율은 분모>0 이 보장된다
+    (예: 자본잠식으로 자기자본<0 이면 ROE는 계산 불가로 빠져 여기 값이 오지 않음 → `_finite_float`가
+    None → 중립 '무엇을 재는지' 문구만 노출). 저 가드를 `== 0` 등으로 완화하면 이 문구가 틀어질 수 있어
+    test_ui_helpers 에 회귀 잠금 테스트를 둔다.
+    """
+    name = (ratio_name or "").strip()
+    f = _finite_float(raw)
+
+    # 손익성 — 음수면 적자(순손실). 부호 기준은 값과 무관하게 항상 참.
+    if name == "영업이익률":
+        return ("본업(영업)에서 손실 — 매출보다 영업에 쓴 비용이 큼" if f is not None and f < 0
+                else "본업(영업)으로 매출에서 이익을 얼마나 남기는지")
+    if name == "순이익률":
+        return ("모든 비용을 뺀 최종 결과가 적자(순손실)" if f is not None and f < 0
+                else "매출에서 최종적으로 이익이 얼마나 남는지")
+    if name == "ROA":
+        return ("가진 자산으로 이익을 내지 못하고 손실" if f is not None and f < 0
+                else "가진 자산으로 이익을 얼마나 내는지")
+    if name == "ROE":
+        return ("주주 몫 자본 대비 손실이 남" if f is not None and f < 0
+                else "주주가 낸 자본으로 이익을 얼마나 내는지")
+
+    # 재무구조 — 빚의 크기/비중
+    if name == "부채비율":
+        if f is not None:
+            return f"빚(부채)이 자기자본의 약 {f:.1f}배 규모 — 클수록 빚 의존이 큼"
+        return "자기자본 대비 빚(부채)이 몇 배인지"
+    if name == "부채비중":
+        return "전체 자산 중 빚(부채)이 차지하는 비중"
+    if name == "차입금의존도":
+        return "전체 자산 중 이자를 내는 빌린 돈의 비중"
+
+    # 유동성 — 1배·0 기준은 값과 무관하게 항상 참
+    if name == "유동비율":
+        return ("1년 안에 갚을 빚보다 현금화할 수 있는 자산이 적음" if f is not None and f < 1
+                else "1년 안에 갚을 빚을 현금화 가능한 자산으로 감당하는 정도")
+    if name == "운전자본비율":
+        return ("단기 부채가 단기 자산보다 많아 운전자본이 마이너스" if f is not None and f < 0
+                else "단기 자산이 단기 부채를 얼마나 넘는지(여윳돈)")
+    if name == "이자보상배율":
+        return ("영업이익으로 이자비용을 다 감당하지 못함" if f is not None and f < 1
+                else "영업이익으로 이자비용을 몇 배나 감당하는지")
+
+    # 운전자본 계정 비중
+    if name == "매출채권비율":
+        return "자산 중 아직 받지 못한 외상매출(매출채권)의 비중"
+    if name == "재고자산비율":
+        return "자산 중 아직 팔지 못한 재고의 비중"
+    if name == "매입채무비율":
+        return "자산 대비 아직 갚지 않은 외상매입(매입채무)의 비중"
+
+    # 회전율 — 한 해 몇 번
+    if name == "총자산회전율":
+        return "가진 자산을 매출로 얼마나 활발히 돌리는지"
+    if name == "재고자산회전율":
+        return "재고가 한 해 동안 몇 번이나 팔려 나가는지"
+    if name == "매출채권회전율":
+        return "외상으로 판 매출을 한 해 동안 몇 번이나 회수하는지"
+
+    return ""
+
+
 def _df_to_table(df) -> dict:
     """DataFrame → {'columns': [...], 'rows': [[...], ...]} (NaN/None → '')."""
     if df is None or getattr(df, "empty", True):

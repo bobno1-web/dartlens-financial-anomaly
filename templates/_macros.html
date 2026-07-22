@@ -60,12 +60,15 @@
 {%- set pct  = cell(row, columns, '산업 내 위치(percentile)') | trim -%}
 {%- set rel  = relof(row, columns) -%}
 {%- set absr = cell(row, columns, '절대판정(red flag)') | trim -%}
+{# Loop 26: 각 항목 쉬운 한 줄 설명(어려운 회계 용어 대신 일상어). 값·판정 불변 — 값을 '읽어' 말로만 풂. #}
+{%- set expl = val | explain_ratio(name) -%}
 {%- if tone == 'risk' -%}
 <div class="dl-ratio dl-ratio-risk tone-risk">
   <div class="rt-head">
     <div class="rt-name">{{ name }}</div>
     <div class="rt-badges">{{ rel_badge(rel) }}{{ abs_badge(absr) }}</div>
   </div>
+  {% if expl %}<div class="rt-explain">{{ expl }}</div>{% endif %}
   {{ ratio_bar(val, med, name) }}
   {# Loop 24: 위험 카드의 'percentile' 줄 제거 — 우리/산업 막대로 상대 위치가 이미 보여 정보 중복. #}
 </div>
@@ -74,6 +77,7 @@
 <div class="dl-ratio tone-info">
   <div class="rt-left">
     <div class="rt-name">{{ name }}</div>
+    {% if expl %}<div class="rt-explain">{{ expl }}</div>{% endif %}
     <div class="rt-reason">{% if reason %}{{ reason }}{% else %}데이터 부족으로 판정을 보류했습니다.{% endif %}</div>
   </div>
   <div class="rt-badges">{{ rel_badge(rel) }}{{ abs_badge(absr) }}</div>
@@ -82,6 +86,7 @@
 <div class="dl-ratio tone-normal">
   <div class="rt-left">
     <div class="rt-name">{{ name }}</div>
+    {% if expl %}<div class="rt-explain">{{ expl }}</div>{% endif %}
     <div class="rt-metrics">
       {% if val %}<span title="{{ val }}">대상값 <b>{{ val | fmt_ratio(name) }}</b></span>{% endif %}
       {% if med %}<span title="{{ med }}">산업중앙 <b>{{ med | fmt_ratio(name) }}</b></span>{% endif %}
@@ -104,6 +109,40 @@
         <thead><tr>{% for c in table.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
         <tbody>
           {% for row in table.rows %}<tr>{% for x in row %}<td>{{ x }}</td>{% endfor %}</tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="dl-note">표시할 데이터가 없습니다.</p>
+  {% endif %}
+{%- endmacro %}
+
+{# 09_제한적_peer_비교 전용 표(Loop 26). 값 컬럼(대상회사 값·peer별 값·참고 중위값)만 행의 '비율명'
+   단위로 2자리+단위(%/배) 반올림해 보여준다. 원본 full precision 은 title 툴팁·엑셀에 그대로 보존
+   (INV-7 표시 전용, 값 불변). 나머지 컬럼(회사명·순위·사유 등)은 원문 그대로 출력. #}
+{% macro render_sparse_table(table) -%}
+  {% if table.note %}
+    <p class="dl-note">{{ table.note }}</p>
+  {% elif table.rows %}
+    {%- set ns = namespace(nameidx=-1) -%}
+    {%- for c in table.columns -%}{%- if c == '비율명' %}{% set ns.nameidx = loop.index0 %}{% endif -%}{%- endfor -%}
+    <div class="dl-tablewrap">
+      <table class="dl-table">
+        <thead><tr>{% for c in table.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for row in table.rows %}
+            {%- set rname = (row[ns.nameidx] if ns.nameidx >= 0 and ns.nameidx < row|length else '') -%}
+            <tr>
+              {%- for x in row -%}
+                {%- set col = (table.columns[loop.index0] if loop.index0 < table.columns|length else '') -%}
+                {%- if x and (col.endswith(' 값') or col == '참고 중위값(비통계)') -%}
+                  <td title="{{ x }}">{{ x | fmt_ratio(rname) }}</td>
+                {%- else -%}
+                  <td>{{ x }}</td>
+                {%- endif -%}
+              {%- endfor -%}
+            </tr>
+          {% endfor %}
         </tbody>
       </table>
     </div>

@@ -225,6 +225,26 @@ a { color: inherit; }
 .dl-tier-label { font-size: .8rem; font-weight: 700; color: var(--ink-3); letter-spacing: .02em; margin: 1.1rem 0 .1rem; text-transform: uppercase; }
 .dl-tier-label:first-child { margin-top: 0; }
 
+/* ── 3종 신호 그룹 헤더 (Loop 26: 절대 주의 / 산업 대비 특이 / 판정 불가) ─────────── */
+.dl-signal-head { margin: 1.5rem 0 .65rem; }
+.dl-signal-head:first-of-type { margin-top: .4rem; }
+.dl-signal-title { display: flex; align-items: baseline; gap: .5rem; font-size: 1.02rem; font-weight: 700; color: var(--ink); }
+.dl-signal-desc { margin: .28rem 0 0; font-size: .845rem; color: var(--ink-2); line-height: 1.5; }
+/* 건수 배지 — INV-8: 앰버(절대 주의)/무채색(특이)/회색(판정 불가), 초록·빨강 없음 */
+.dl-signal-count { font-size: .78rem; font-weight: 700; line-height: 1; padding: .2rem .55rem; border-radius: 999px;
+  color: var(--neutral-fg); background: var(--neutral-bg); border: 1px solid var(--neutral-bd); }
+.dl-signal-count.is-amber { color: var(--amber-fg); background: var(--amber-bg); border-color: var(--amber-bd); }
+.dl-signal-count.is-gray  { color: var(--gray-fg);  background: var(--gray-bg);  border-color: var(--gray-bd); }
+/* 0건 묶음 — 카드 없이 짧게 '없음' */
+.dl-signal-head.is-none { display: flex; align-items: baseline; gap: .5rem; margin: 1rem 0 .2rem; }
+.dl-signal-head.is-none .dl-signal-title { font-size: .92rem; font-weight: 600; color: var(--ink-3); }
+.dl-signal-none { font-size: .76rem; font-weight: 600; color: var(--gray-fg); background: var(--gray-bg);
+  border: 1px solid var(--gray-bd); border-radius: 999px; padding: .16rem .5rem; }
+
+/* 각 항목 쉬운 한 줄 설명 (Loop 26) */
+.rt-explain { margin-top: .3rem; font-size: .84rem; color: var(--ink-2); line-height: 1.5; overflow-wrap: anywhere; }
+.dl-ratio.tone-normal .rt-explain { color: var(--ink-3); opacity: .9; }
+
 /* ── 표 (peer/제외/sparse) ────────────────────────────────────────────── */
 .dl-tcap { font-weight: 600; font-size: .9rem; margin: 0 0 .5rem; color: var(--ink); }
 .dl-note { color: var(--ink-2); font-size: .86rem; font-style: italic; }

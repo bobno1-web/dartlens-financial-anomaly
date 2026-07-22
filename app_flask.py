@@ -52,6 +52,12 @@ def _fmt_pct(raw):
     return web_engine.format_display_number(raw, 1)
 
 
+# Loop 26: 비율명+값 → 쉬운 한 줄 설명(표시 전용, 값·판정 불변). result 카드에서만 사용.
+@app.template_filter("explain_ratio")
+def _explain_ratio(raw, ratio_name=""):
+    return web_engine.explain_ratio(raw, ratio_name)
+
+
 # ── 세션 상태 (서버 메모리 전용) ─────────────────────────────────────────────
 # 로컬 단일 사용자 도구다. API 키/입력값은 서버 프로세스 메모리(_SESSIONS)에만 두고, 쿠키에는
 # 불투명 sid 만 담는다. 키 값은 쿠키·파일·로그·화면·산출물 어디에도 저장하지 않는다(세션 메모리만).
