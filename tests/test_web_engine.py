@@ -58,6 +58,34 @@ def test_explain_ratio_unknown_ratio_returns_empty():
     assert web_engine.explain_ratio(1.0, None) == ""
 
 
+# ── 검증방 Loop 26 반송: 운전자본 계정 3비율 분모(매출액/매출원가) 문구 잠금 ─────────────
+# 산식(화면 표시): 매출채권비율=매출채권/매출액 · 재고자산비율=재고자산/매출액 ·
+# 매입채무비율=매입채무/매출원가. 설명에 '자산'(총자산 분모)이 들어가면 화면 산식과 모순 → 금지.
+def test_explain_ratio_receivable_ratio_denominator_is_sales():
+    txt = web_engine.explain_ratio(0.1, "매출채권비율")   # = 매출채권 / 매출액
+    assert "매출 대비" in txt          # 분모=매출액을 반영
+    assert "매출원가" not in txt        # 매입채무비율(분모=매출원가)과 구분
+    assert "자산" not in txt            # '자산 대비'(총자산 분모) 비율과 혼동 금지
+
+
+def test_explain_ratio_inventory_ratio_denominator_is_sales():
+    txt = web_engine.explain_ratio(0.1, "재고자산비율")   # = 재고자산 / 매출액
+    assert "매출 대비" in txt           # 분모=매출액을 반영
+    assert "자산" not in txt            # 이름은 '재고자산'이지만 설명 분모는 '자산'이 아님
+
+
+def test_explain_ratio_payable_ratio_denominator_is_cogs():
+    txt = web_engine.explain_ratio(0.1, "매입채무비율")   # = 매입채무 / 매출원가
+    assert "매출원가 대비" in txt        # 분모=매출원가를 반영(매출액 아님)
+    assert "자산" not in txt
+
+
+def test_explain_ratio_asset_based_ratios_keep_asset_wording():
+    """대조군: 총자산 분모 비율(부채비중·차입금의존도)은 '자산' 표현 유지 — 위 3비율과 혼동 방지 잠금."""
+    assert "자산" in web_engine.explain_ratio(0.6, "부채비중")      # = 부채총계 / 자산총계
+    assert "자산" in web_engine.explain_ratio(0.2, "차입금의존도")  # = 이자부차입금 / 자산총계
+
+
 # ── format_ratio_value: 09시트/카드 숫자 정리(2자리 + 성격별 단위) ─────────────────────
 def test_format_ratio_value_units_and_rounding():
     assert web_engine.format_ratio_value("5.801885981351322", "이자보상배율") == "5.80배"  # mult
