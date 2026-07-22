@@ -288,12 +288,14 @@ def build_interpretation(final_path) -> list[str]:
     # benchmark_quality 정의상 제한 사유는 '계산 가능 peer 표본이 작거나(n<2*min_peers) 계정
     # 커버리지(n/CFS성공)가 낮음'이며 고정 peer 임계값이 아니다(coverage 부족은 peer가 많아도 발생 —
     # 예: peer 22·26에서도 WEAK). 따라서 특정 개수를 지어내지 않고 실제 제한 비율만 동적으로 나열한다.
+    # Loop 24 마무리(NOTE-B): 사유가 peer 부족(현대차)·coverage 부족(한화 peer 22) 양쪽이므로
+    # '동종업체가 적어'(peer 수만 지칭) 대신 둘 다 포괄하는 '비교 표본이 부족해'로 표기한다.
     if qcol and "비율명" in df.columns:
         limited = [str(r["비율명"]) for _, r in df.iterrows()
                    if str(r.get(qcol)).upper().startswith(("WEAK", "LIMITED"))]
         if limited:
             lines.append(" · ".join(limited[:4])
-                         + " 항목은 비교 가능한 동종업체(peer)가 적어 산업 비교의 신뢰도가 제한적입니다.")
+                         + " 항목은 비교 표본이 부족해 산업 비교의 신뢰도가 낮습니다.")
     return lines
 
 
